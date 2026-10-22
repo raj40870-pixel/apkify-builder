@@ -471,21 +471,13 @@ public class SplashActivity extends Activity {
     } catch (e) {}
 
     if (needsDownload) {
-      sendProgress(65, "Pre-downloading Gradle build tool (bypassing SSL check)...");
+      sendProgress(65, "Preparing Gradle build tool...");
       await fs.mkdir(gradleZipDir, { recursive: true });
-      const oldRejectVal = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
       try {
-        const res = await fetch("https://services.gradle.org/distributions/gradle-8.2.1-all.zip");
-        if (!res.ok) throw new Error(`Failed to download Gradle wrapper: status ${res.status}`);
-        const buffer = Buffer.from(await res.arrayBuffer());
-        await fs.writeFile(gradleZipPath, buffer);
-      } finally {
-        if (oldRejectVal !== undefined) {
-          process.env.NODE_TLS_REJECT_UNAUTHORIZED = oldRejectVal;
-        } else {
-          delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-        }
+        const curlCmd = `curl.exe -L -k --retry 3 --connect-timeout 30 -o "${gradleZipPath}" "https://services.gradle.org/distributions/gradle-8.2.1-all.zip"`;
+        await execAsync(curlCmd);
+      } catch (err: any) {
+        console.warn('[gradle-wrapper] Pre-download failed, letting gradlew handle it:', err.message);
       }
     }
 
