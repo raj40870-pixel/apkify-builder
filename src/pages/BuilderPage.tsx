@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { useNavigate, Link } from 'react-router-dom';
 import { logout, getStoredUser, getAuthToken, fetchMe } from '../lib/auth';
+import { API_BASE_URL } from '../lib/api';
 
 export default function BuilderPage() {
   const navigate = useNavigate();
@@ -177,7 +178,7 @@ export default function BuilderPage() {
       }
 
       const isPremium = currentUser?.plan && currentUser.plan !== 'Free';
-      const response = await fetch('/api/build-apk', {
+      const response = await fetch(`${API_BASE_URL}/api/build-apk`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -244,7 +245,8 @@ export default function BuilderPage() {
                 } catch (_) {}
                 // Trigger auto download
                 fetchMe().catch(() => {});
-                window.location.href = data.downloadUrl;
+                const fullDownloadUrl = data.downloadUrl.startsWith('http') ? data.downloadUrl : `${API_BASE_URL}${data.downloadUrl}`;
+                window.location.href = fullDownloadUrl;
                 setTimeout(() => { setIsBuilding(false); }, 2000);
                 return;
               }

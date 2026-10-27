@@ -1,3 +1,5 @@
+import { API_BASE_URL } from './api';
+
 const isBrowser = () => typeof window !== 'undefined' && typeof localStorage !== 'undefined';
 
 const notifyAuthChange = () => {
@@ -23,7 +25,7 @@ export const getAuthToken = () => {
 export const fetchMe = async () => {
   const token = getAuthToken();
   if (!token) return null;
-  const res = await fetch('/api/auth/me', {
+  const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   const json = await safeJson(res);
@@ -39,7 +41,7 @@ export const fetchMe = async () => {
 
 export const loginWithEmail = async (email: string, password?: string) => {
   if (!password) throw new Error('Password is required');
-  const res = await fetch('/api/auth/login', {
+  const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -60,7 +62,7 @@ export const loginWithEmail = async (email: string, password?: string) => {
 
 export const signupWithEmail = async (name: string, email: string, password?: string, confirmPassword?: string) => {
   if (!password || password !== confirmPassword) throw new Error('Passwords do not match');
-  const res = await fetch('/api/auth/signup', {
+  const res = await fetch(`${API_BASE_URL}/api/auth/signup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password, confirmPassword, name }),
@@ -73,51 +75,46 @@ export const signupWithEmail = async (name: string, email: string, password?: st
 export const logout = async () => {
   if (!isBrowser()) return;
   localStorage.removeItem('isLoggedIn');
-  localStorage.removeItem('user');
   localStorage.removeItem('authToken');
-  localStorage.removeItem('token');
+  localStorage.removeItem('user');
   notifyAuthChange();
+  try {
+    sessionStorage.clear();
+  } catch (e) {}
 };
 
-export const getStoredUser = () => {
+export const getCurrentUser = (): any => {
   if (!isBrowser()) return null;
-  try {
-    const user = localStorage.getItem('user');
-    if (user) return JSON.parse(user);
-  } catch {}
+  const user = localStorage.getItem('user');
+  if (user) {
+    try {
+      return JSON.parse(user);
+    } catch {
+      return null;
+    }
+  }
   return null;
 };
 
-export const getBuildHistory = () => {
-  if (!isBrowser()) return [];
-  const history = localStorage.getItem('buildHistory');
-  return history ? JSON.parse(history) : [];
+export const getStoredUser = getCurrentUser;
+
+export const checkIsAuthenticated = (): boolean => {
+  if (!isBrowser()) return false;
+  return localStorage.getItem('isLoggedIn') === 'true' && !!getAuthToken();
 };
 
-export const addBuildToHistory = (appName: string, appVersion = '1.0.0') => {
-  const history = getBuildHistory();
-  const user = getStoredUser();
-  const plan = user?.plan || 'Free';
-  let limit = 10;
-  if (plan === 'Pro') limit = 15;
-  else if (plan === 'Business') limit = 10;
-  else if (plan === 'Enterprise') limit = 50;
+export const refreshCredits = async () => {
+  return await fetchMe();
+};
 
-  if (history.length >= limit) {
-    throw new Error('History limit full. Please clean history to continue building.');
-  }
+export const getPlanType = (): string => {
+  const user = getCurrentUser();
+  return user?.plan || 'Free';
+};
 
-  const newBuild = {
-    id: Date.now().toString(),
-    app_name: appName,
-    app_version: appVersion,
-    created_at: new Date().toISOString(),
-    status: 'Building',
-    progress: 0,
-  };
-  const nextHistory = [newBuild, ...history];
-  localStorage.setItem('buildHistory', JSON.stringify(nextHistory));
-  return newBuild;
+export const isPremiumUser = (): boolean => {
+  const plan = getPlanType();
+  return plan === 'Pro' || plan === 'Enterprise';
 };
 
 export const clearBuildHistory = () => {
@@ -128,7 +125,7 @@ export const clearBuildHistory = () => {
 export const upgradeToPremium = async (plan: string = 'Pro'): Promise<any> => {
   const token = getAuthToken();
   if (!token) throw new Error('Not logged in');
-  const res = await fetch('/api/auth/upgrade', {
+  const res = await fetch(`${API_BASE_URL}/api/auth/upgrade`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ plan }),
@@ -138,6 +135,7 @@ export const upgradeToPremium = async (plan: string = 'Pro'): Promise<any> => {
   await fetchMe();
   return json;
 };
+
 export const changePassword = async () => ({ success: false, error: 'Not implemented' });
 export const requestPasswordReset = async () => ({ success: false, error: 'Not implemented' });
 export const verifyPasswordResetOTP = async () => ({ success: false, error: 'Not implemented' });

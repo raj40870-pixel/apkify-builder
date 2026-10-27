@@ -5,6 +5,7 @@ import { User as UserType } from '../types';
 import { logout, getStoredUser, fetchMe } from '../lib/auth';
 import { fetchBuildHistory, deleteBuildsAPI } from '../lib/freeCreditSystem';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../lib/api';
 
 interface DashboardPageProps {
   user: UserType;
@@ -326,7 +327,7 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
                     <div className="flex sm:justify-end items-center gap-3">
                        {build.status === 'Completed' && (
                          <a 
-                           href={build.downloadUrl || '#'}
+                           href={build.downloadUrl ? (build.downloadUrl.startsWith('http') ? build.downloadUrl : `${API_BASE_URL}${build.downloadUrl}`) : '#'}
                            onClick={(e) => { if (!build.downloadUrl) { e.preventDefault(); alert('Download link is unavailable for this older build.'); } }}
                            download
                            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 transition-colors shadow-lg shadow-blue-900/20"
