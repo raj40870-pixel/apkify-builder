@@ -8,10 +8,10 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { exec, spawn } from 'child_process';
+import { exec, spawn, execSync } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, realpathSync, readdirSync } from 'fs';
 import os from 'os';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
@@ -71,8 +71,171 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Diagnostic endpoint to inspect live environment
+app.get('/api/diag', (req, res) => {
+  const run = (cmd: string) => {
+    try { return execSync(cmd + ' 2>&1').toString().trim(); }
+    catch (e: any) { return 'ERR: ' + (e.stdout?.toString() || e.message); }
+  };
+  const info: any = {
+    platform: process.platform,
+    arch: process.arch,
+    node: process.version,
+    totalMemMB: Math.round(os.totalmem() / 1024 / 1024),
+    freeMemMB: Math.round(os.freemem() / 1024 / 1024),
+    env: {
+      JAVA_HOME: process.env.JAVA_HOME,
+      ANDROID_HOME: process.env.ANDROID_HOME,
+      PATH: process.env.PATH,
+      K_SERVICE: process.env.K_SERVICE,
+    },
+    tools: {
+      curl: run('which curl'),
+      tar: run('which tar'),
+      unzip: run('which unzip'),
+      java: run('which java'),
+      javac: run('which javac'),
+      sdkmanager: run('which sdkmanager'),
+    }
+  };
+  try {
+    if (process.platform !== 'win32' && existsSync('/tmp/jdk-17')) {
+      info.tmpJdkExists = true;
+    }
+    if (process.platform !== 'win32' && existsSync('/tmp/android-sdk')) {
+      info.tmpSdkExists = true;
+    }
+  } catch (_) {}
+  res.json(info);
+});
+
 
 // Helper function to run the Capacitor Android build process natively on the server host
+
+// Helper to write all official Android SDK license hashes for automated builds
+async function writeAllLicenses(licensesDir: string) {
+  await fs.mkdir(licensesDir, { recursive: true });
+  await fs.writeFile(
+    path.join(licensesDir, 'android-sdk-license'),
+    '24333f8a63718c41501f30fb50a0f44766699865\n8933042294d9c04146c0775a119bc8473e4b43d5\nd56f518547957e8415d31f49d69c65996bc2262d\n24333f8a63b6825ea9c5514f83c2829b004d1fee\n8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb78af6dfcb131a6481e\n'
+  );
+  await fs.writeFile(
+    path.join(licensesDir, 'android-sdk-preview-license'),
+    '84831b9409646a918e30573bab4c9c91346d8abd\n'
+  );
+  await fs.writeFile(
+    path.join(licensesDir, 'android-googletv-license'),
+    '601085b94cd77f0b54ff86406957099ebe79c4d6\n'
+  );
+  await fs.writeFile(
+    path.join(licensesDir, 'android-googlexr-license'),
+    'ceff83576aac4f7f37cb98fe189e9fb3c49d3b81\n'
+  );
+  await fs.writeFile(
+    path.join(licensesDir, 'android-sdk-arm-dbt-license'),
+    '859f317696f67ef3d7f30a50a5560e7834b43903\n'
+  );
+  await fs.writeFile(
+    path.join(licensesDir, 'google-gdk-license'),
+    '33b6a2b64607f11b759f320ef9dff4ae5c47d97a\n'
+  );
+  await fs.writeFile(
+    path.join(licensesDir, 'mips-android-sysimage-license'),
+    'e9acab5b5fbb560a72cfaecce8946896ff6aab9d\n'
+  );
+}
+
+// Auto-provision portable OpenJDK 17 and Android SDK on Linux without root/apt-get
+async function ensureLinuxJavaAndSdk(sendProgress: (p: number, s: string) => void) {
+  if (process.platform === 'win32') return;
+
+  const jdkHome = '/tmp/jdk-17/jdk-17.0.11+9';
+
+  // 1. Check & Ensure Java 17
+  let hasWorkingJava = false;
+  try {
+    const v = execSync('java -version 2>&1').toString();
+    if (v.includes('Runtime Environment') || v.includes('openjdk') || v.includes('version')) {
+      hasWorkingJava = true;
+    }
+  } catch (_) {}
+
+  if (!hasWorkingJava) {
+    if (existsSync(path.join(jdkHome, 'bin', 'java'))) {
+      process.env.JAVA_HOME = jdkHome;
+      process.env.PATH = `${jdkHome}/bin:${process.env.PATH}`;
+      console.log('[AutoJava] Using cached Java 17 at:', jdkHome);
+    } else {
+      sendProgress(12, "Setting up Java 17 Runtime (one-time setup)...");
+      console.log('[AutoJava] Downloading portable OpenJDK 17 Linux tarball...');
+      await fs.mkdir('/tmp/jdk-17', { recursive: true });
+      const tarPath = '/tmp/jdk17.tar.gz';
+      const jdkUrl = 'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.11%2B9/OpenJDK17U-jdk_x64_linux_hotspot_17.0.11_9.tar.gz';
+      try {
+        execSync(`curl -fsSL -L -o "${tarPath}" "${jdkUrl}"`);
+      } catch (_) {
+        const resp = await fetch(jdkUrl, { redirect: 'follow' });
+        const buf = Buffer.from(await resp.arrayBuffer());
+        await fs.writeFile(tarPath, buf);
+      }
+      execSync(`tar -xzf "${tarPath}" -C /tmp/jdk-17`);
+      await fs.unlink(tarPath).catch(() => {});
+      process.env.JAVA_HOME = jdkHome;
+      process.env.PATH = `${jdkHome}/bin:${process.env.PATH}`;
+      console.log('[AutoJava] Portable Java 17 ready at:', jdkHome);
+    }
+  }
+
+  // 2. Check & Ensure Android SDK & Licenses
+  const sdkHome = '/tmp/android-sdk';
+  process.env.ANDROID_HOME = sdkHome;
+  process.env.ANDROID_SDK_ROOT = sdkHome;
+
+  // Always make sure official accepted licenses exist
+  await writeAllLicenses(path.join(sdkHome, 'licenses'));
+
+  const sdkmanager = `${sdkHome}/cmdline-tools/latest/bin/sdkmanager`;
+  const hasPlatforms34 = existsSync(path.join(sdkHome, 'platforms', 'android-34'));
+
+  if (!existsSync(sdkmanager)) {
+    sendProgress(14, "Setting up Android SDK Tools (one-time setup)...");
+    console.log('[AutoSdk] Downloading Android SDK Command-line tools...');
+    await fs.mkdir(`${sdkHome}/cmdline-tools`, { recursive: true });
+    const zipPath = '/tmp/cmdline-tools.zip';
+    const sdkUrl = 'https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip';
+    try {
+      execSync(`curl -fsSL -L -o "${zipPath}" "${sdkUrl}"`);
+    } catch (_) {
+      const resp = await fetch(sdkUrl, { redirect: 'follow' });
+      const buf = Buffer.from(await resp.arrayBuffer());
+      await fs.writeFile(zipPath, buf);
+    }
+
+    try {
+      execSync(`unzip -q -o "${zipPath}" -d "${sdkHome}/cmdline-tools"`);
+    } catch (_) {
+      const jarBin = existsSync(`${jdkHome}/bin/jar`) ? `${jdkHome}/bin/jar` : 'jar';
+      execSync(`"${jarBin}" -xf "${zipPath}"`, { cwd: `${sdkHome}/cmdline-tools` });
+    }
+    execSync(`rm -rf "${sdkHome}/cmdline-tools/latest" && mv "${sdkHome}/cmdline-tools/cmdline-tools" "${sdkHome}/cmdline-tools/latest"`);
+    await fs.unlink(zipPath).catch(() => {});
+  }
+
+  if (existsSync(sdkmanager) && !hasPlatforms34) {
+    sendProgress(16, "Installing Android 34 SDK platform and build tools...");
+    try {
+      execSync(`chmod +x "${sdkmanager}"`);
+      execSync(`yes | "${sdkmanager}" --sdk_root="${sdkHome}" --licenses 2>/dev/null || true`);
+      execSync(`"${sdkmanager}" --sdk_root="${sdkHome}" "platform-tools" "platforms;android-34" "build-tools;34.0.0"`);
+    } catch (err: any) {
+      console.warn('[AutoSdk] sdkmanager install warning (Gradle will auto-download with accepted licenses):', err.message);
+    }
+  }
+
+  process.env.PATH = `${sdkHome}/cmdline-tools/latest/bin:${sdkHome}/platform-tools:${process.env.PATH}`;
+  console.log('[AutoSdk] Android SDK ready at:', sdkHome);
+}
+
 async function buildApkLocally(
   jobId: string,
   url: string,
@@ -84,9 +247,9 @@ async function buildApkLocally(
   zipData?: string,
   isPremium: boolean = false
 ) {
-  const isCloudOrMock = process.env.MOCK_BUILD === 'true' || !!process.env.K_SERVICE || !!process.env.GOOGLE_CLOUD_PROJECT;
+  const isCloudOrMock = process.env.MOCK_BUILD === 'true';
   if (isCloudOrMock) {
-    console.log('[local-build] Cloud/MOCK_BUILD mode active. Simulating APK build...');
+    console.log('[local-build] MOCK_BUILD mode active. Simulating APK build...');
     const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
     
     sendProgress(10, "Extracting ZIP contents...");
@@ -136,6 +299,7 @@ async function buildApkLocally(
   const packageJson = {
     name: "apk_build_job",
     version: "1.0.0",
+    type: "module",
     dependencies: {
       "@capacitor/core": "^6.0.0",
       "@capacitor/android": "^6.0.0"
@@ -166,26 +330,60 @@ async function buildApkLocally(
 
   await fs.writeFile(path.join(tempDir, 'capacitor.config.json'), JSON.stringify(capConfigObj, null, 2));
 
-  const capacitorConfig = `import { CapacitorConfig } from '@capacitor/cli';\nconst config: CapacitorConfig = ${JSON.stringify(capConfigObj, null, 2)};\nexport default config;`;
-  await fs.writeFile(path.join(tempDir, 'capacitor.config.ts'), capacitorConfig);
+  // Using capacitor.config.json directly to avoid Node.js TypeScript/ESM parsing warnings on Linux
+  await fs.unlink(path.join(tempDir, 'capacitor.config.ts')).catch(() => {});
 
   const runCommand = (cmd: string, args: string[], cwd: string, onLog: (data: string) => void) => {
     return new Promise<boolean>((resolve) => {
-      const javaHome = process.env.JAVA_HOME === 'C:\\Users\\Lenovo\\openjdk-17'
-        ? 'C:\\Program Files\\Microsoft\\jdk-17.0.19.10-hotspot'
-        : (process.env.JAVA_HOME || 'C:\\Program Files\\Microsoft\\jdk-17.0.19.10-hotspot');
-
       const isWin = process.platform === 'win32';
+      let javaHome = process.env.JAVA_HOME;
+      if (!javaHome || javaHome.includes('Lenovo')) {
+        if (isWin) {
+          javaHome = 'C:\\Program Files\\Microsoft\\jdk-17.0.19.10-hotspot';
+        } else {
+          if (existsSync('/tmp/jdk-17/jdk-17.0.11+9/bin/java')) {
+            javaHome = '/tmp/jdk-17/jdk-17.0.11+9';
+          } else {
+            try {
+              const whichJ = execSync('which java 2>/dev/null').toString().trim();
+              if (whichJ) {
+                const realJ = realpathSync(whichJ);
+                javaHome = path.dirname(path.dirname(realJ));
+              }
+            } catch (_) {}
+            if (!javaHome && existsSync('/usr/lib/jvm/java-17-openjdk-amd64')) {
+              javaHome = '/usr/lib/jvm/java-17-openjdk-amd64';
+            }
+          }
+        }
+      }
+
+      let androidHome = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT;
+      if (!androidHome) {
+        androidHome = isWin ? 'C:\\Users\\Kamaljit\\android-sdk' : '/tmp/android-sdk';
+      }
+
       const sslOpts = isWin ? "-Djavax.net.ssl.trustStoreType=WINDOWS-ROOT" : "";
 
-      const processInstance = spawn(cmd, args, { 
+      const env: any = {
+        ...process.env,
+        GRADLE_OPTS: `${sslOpts} -Xmx1280m -Dorg.gradle.jvmargs=-Xmx1280m -Dkotlin.compiler.execution.strategy=in-process`
+      };
+      if (javaHome) {
+        env.JAVA_HOME = javaHome;
+        env.PATH = `${javaHome}/bin:${env.PATH || ''}`;
+      }
+      if (androidHome) {
+        env.ANDROID_HOME = androidHome;
+        env.ANDROID_SDK_ROOT = androidHome;
+        env.PATH = `${androidHome}/cmdline-tools/latest/bin:${androidHome}/platform-tools:${env.PATH || ''}`;
+      }
+
+      const safeCmd = isWin && cmd.includes(' ') && !cmd.startsWith('"') ? `"${cmd}"` : cmd;
+      const processInstance = spawn(safeCmd, args, { 
         cwd, 
         shell: true,
-        env: {
-          ...process.env,
-          JAVA_HOME: javaHome,
-          GRADLE_OPTS: `${sslOpts} -Xmx3072m -Dorg.gradle.jvmargs=-Xmx3072m -Dkotlin.compiler.execution.strategy=in-process`
-        }
+        env
       });
       
       processInstance.stdout.on('data', (data) => onLog(data.toString()));
@@ -266,6 +464,7 @@ async function buildApkLocally(
     if (!currentPkg.dependencies) currentPkg.dependencies = {};
     if (!currentPkg.devDependencies) currentPkg.devDependencies = {};
     
+    currentPkg.type = "module";
     currentPkg.dependencies["@capacitor/core"] = "^6.0.0";
     currentPkg.dependencies["@capacitor/android"] = "^6.0.0";
     currentPkg.devDependencies["@capacitor/cli"] = "^6.0.0";
@@ -278,16 +477,26 @@ async function buildApkLocally(
     if (!npmInstallOk) throw new Error("Failed to install npm dependencies.");
 
     sendProgress(25, "Adding Android platform...");
-    const capAddOk = await runCommand('npx', ['@capacitor/cli', 'add', 'android'], tempDir, (log) => {
+    const capBinAbs = path.join(tempDir, 'node_modules', '.bin', process.platform === 'win32' ? 'cap.cmd' : 'cap');
+    const hasCapBin = existsSync(capBinAbs);
+    const capCmd = hasCapBin ? (process.platform === 'win32' ? `"${capBinAbs}"` : './node_modules/.bin/cap') : 'npx';
+    const capAddArgs = hasCapBin ? ['add', 'android'] : ['--package=@capacitor/cli', 'cap', 'add', 'android'];
+
+    let capAddLogs = '';
+    const capAddOk = await runCommand(capCmd, capAddArgs, tempDir, (log) => {
+      capAddLogs += log + '\n';
       console.log(`[cap add] ${log.trim()}`);
     });
-    if (!capAddOk) throw new Error("Failed to add Android platform.");
+    if (!capAddOk) throw new Error(`Failed to add Android platform. Logs: ${capAddLogs.slice(-400).trim()}`);
 
     sendProgress(40, "Syncing assets and configurations...");
-    const capSyncOk = await runCommand('npx', ['@capacitor/cli', 'sync', 'android'], tempDir, (log) => {
+    const capSyncArgs = hasCapBin ? ['sync', 'android'] : ['--package=@capacitor/cli', 'cap', 'sync', 'android'];
+    let capSyncLogs = '';
+    const capSyncOk = await runCommand(capCmd, capSyncArgs, tempDir, (log) => {
+      capSyncLogs += log + '\n';
       console.log(`[cap sync] ${log.trim()}`);
     });
-    if (!capSyncOk) throw new Error("Failed to sync Android project.");
+    if (!capSyncOk) throw new Error(`Failed to sync Android project. Logs: ${capSyncLogs.slice(-400).trim()}`);
 
     // Direct configuration sync to avoid Capacitor 6 asset sync/transpile issues and prevent NullPointerException
     const assetsConfigJson = path.join(tempDir, 'android', 'app', 'src', 'main', 'assets', 'capacitor.config.json');
@@ -423,7 +632,7 @@ public class SplashActivity extends Activity {
           await fs.writeFile(buildKeystorePath, Buffer.from(placeholderKeystoreB64, 'base64'));
         }
         
-        propsContent += `\nRELEASE_STORE_FILE=release.keystore\nRELEASE_STORE_PASSWORD=android\nRELEASE_KEY_ALIAS=key0\nRELEASE_KEY_PASSWORD=android\n`;
+        propsContent += `\nRELEASE_STORE_FILE=release.keystore\nRELEASE_STORE_PASSWORD=android\nRELEASE_KEY_ALIAS=key0\nRELEASE_KEY_PASSWORD=android\nandroid.builder.sdkDownload=true\n`;
         await fs.writeFile(gradlePropsFile, propsContent);
 
         const appBuildGradleFile = path.join(tempDir, 'android', 'app', 'build.gradle');
@@ -481,14 +690,35 @@ public class SplashActivity extends Activity {
       }
     }
 
+    if (process.platform !== 'win32') {
+      await ensureLinuxJavaAndSdk(sendProgress);
+      try {
+        await execAsync('chmod +x ./gradlew', { cwd: path.join(tempDir, 'android') });
+      } catch (_) {}
+    }
     sendProgress(70, "Compiling and packaging Android release APK...");
     const gradleCmd = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
     const gradleArgs = [
       'assembleRelease',
-      '-Dorg.gradle.jvmargs=-Xmx3072m',
+      '--no-daemon',
+      '-Dorg.gradle.jvmargs=-Xmx1280m',
       '-Dkotlin.compiler.execution.strategy=in-process'
     ];
+    // Ensure local.properties and licenses exist for Gradle
+    try {
+      const androidDir = path.join(tempDir, 'android');
+      const isWin = process.platform === 'win32';
+      const sdkDir = process.env.ANDROID_HOME || (isWin ? 'C:\\Users\\Kamaljit\\android-sdk' : '/tmp/android-sdk');
+      await fs.writeFile(path.join(androidDir, 'local.properties'), `sdk.dir=${sdkDir.replace(/\\/g, '/')}\n`);
+      await writeAllLicenses(path.join(androidDir, 'licenses'));
+      if (process.platform !== 'win32') {
+        await writeAllLicenses(path.join('/tmp/android-sdk', 'licenses'));
+      }
+    } catch (_) {}
+
+    let gradleLogs = '';
     const gradleOk = await runCommand(gradleCmd, gradleArgs, path.join(tempDir, 'android'), (log) => {
+      gradleLogs += log + '\n';
       console.log(`[gradle] ${log.trim()}`);
       if (log.includes(':app:processReleaseResources')) {
         sendProgress(75, "Processing Android resources...");
@@ -500,7 +730,9 @@ public class SplashActivity extends Activity {
         sendProgress(90, "Packaging Release APK...");
       }
     });
-    if (!gradleOk) throw new Error("Gradle compilation failed.");
+    if (!gradleOk) {
+      throw new Error(`Gradle compilation failed. Logs: ${gradleLogs.slice(-2000).trim()}`);
+    }
 
     const apkPath = path.join(tempDir, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
     if (!existsSync(apkPath)) {
