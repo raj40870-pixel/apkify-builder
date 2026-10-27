@@ -1,7 +1,10 @@
 import axios from 'axios';
 
-// Get base backend URL from environment or default to local relative path
-export const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+// Get base backend URL from environment or fallback to live backend in production
+export const API_BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? 'https://apkify-backend-studio.ai.studio' : '')
+).replace(/\/$/, '');
 
 // Create Axios instance
 const api = axios.create({
