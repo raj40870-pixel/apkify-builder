@@ -311,6 +311,14 @@ async function buildApkLocally(
   };
   await fs.writeFile(path.join(tempDir, 'package.json'), JSON.stringify(packageJson, null, 2));
 
+  // Normalize URL to always include protocol (prevents Capacitor MalformedURLException / NullPointerException)
+  if (url && typeof url === 'string') {
+    url = url.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = `https://${url}`;
+    }
+  }
+
   // Write capacitor.config.ts and capacitor.config.json
   const isLocalMode = (htmlCode && htmlCode.trim().length > 0) || (zipData && zipData.trim().length > 0);
   const isUrlMode = url && url.trim().length > 0 && !isLocalMode;
@@ -322,8 +330,9 @@ async function buildApkLocally(
   };
   if (isUrlMode) {
     capConfigObj.server = {
-      url: url.trim(),
+      url: url,
       cleartext: true,
+      androidScheme: "https",
       allowNavigation: ["*"]
     };
   }
@@ -538,7 +547,9 @@ public class SplashActivity extends Activity {
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             @Override
             public void run() {
-                startActivity(new Intent(SplashActivity.this, MainActivity.class));
+                Intent intent = new Intent(SplashActivity.this, MainActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
                 overridePendingTransition(0, 0);
                 finish();
             }
@@ -610,8 +621,13 @@ public class SplashActivity extends Activity {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="url" content="${url}" />
   <title>${appName}</title>
+  <script>
+    if (window.location.protocol === 'file:' || window.location.hostname === 'localhost') {
+      window.location.replace("${url}");
+    }
+  </script>
 </head>
-<body>
+<body style="margin:0;padding:0;background:#ffffff;display:flex;height:100vh;align-items:center;justify-content:center;font-family:sans-serif;">
   <div id="app">Loading ${appName}...</div>
 </body>
 </html>`;
@@ -757,7 +773,13 @@ public class SplashActivity extends Activity {
 
 // POST /api/build-apk - Native local build runner
 app.post('/api/build-apk', async (req, res) => {
-  const { url, appName, packageId, iconUrl, htmlCode, zipData, isPremium } = req.body;
+  let { url, appName, packageId, iconUrl, htmlCode, zipData, isPremium } = req.body;
+  if (url && typeof url === 'string') {
+    url = url.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = `https://${url}`;
+    }
+  }
   const isLocalMode = (htmlCode && htmlCode.trim().length > 0) || (zipData && zipData.trim().length > 0);
   
   if (!appName || !packageId) {

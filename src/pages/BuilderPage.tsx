@@ -142,7 +142,11 @@ export default function BuilderPage() {
 
 
       // Trigger the build using chunked POST request
-      const targetUrl = activeTab === 'url' ? url : 'https://stellar-internal-fallback.com';
+      let normalizedUrl = url.trim();
+      if (normalizedUrl && !normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+        normalizedUrl = 'https://' + normalizedUrl;
+      }
+      const targetUrl = activeTab === 'url' ? normalizedUrl : 'https://stellar-internal-fallback.com';
       setBuildStage('Connecting to build server...');
 
       // Save build entry to history
@@ -185,7 +189,7 @@ export default function BuilderPage() {
           'Authorization': `Bearer ${getAuthToken()}`
         },
         body: JSON.stringify({
-          url: activeTab === 'url' ? url : '',
+          url: activeTab === 'url' ? normalizedUrl : '',
           htmlCode: activeTab === 'html' ? htmlCode : '',
           zipData: uploadedZipData,
           appName,
