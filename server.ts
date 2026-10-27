@@ -1074,15 +1074,43 @@ async function startServer() {
       });
     } else {
       app.get('/', (req, res) => {
-        res.json({
-          service: 'APKify Builder Backend API',
-          status: 'online',
-          endpoints: {
-            health: '/api/health',
-            auth: '/api/auth',
-            build: '/api/build-apk'
-          }
-        });
+        if (req.accepts('html')) {
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <title>APKify Backend - Live</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0b0f19; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 1rem; }
+    .card { background: #131b2e; padding: 2.5rem; border-radius: 1.25rem; border: 1px solid #1e293b; text-align: center; max-width: 480px; box-shadow: 0 20px 30px -10px rgba(0,0,0,0.6); }
+    .badge { display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 0.4rem 0.9rem; border-radius: 9999px; font-weight: 600; font-size: 0.85rem; margin-bottom: 1.25rem; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 8px #10b981; }
+    h1 { font-size: 1.6rem; margin: 0 0 0.75rem 0; font-weight: 700; }
+    p { color: #94a3b8; font-size: 0.95rem; line-height: 1.5; margin: 0 0 1.75rem 0; }
+    a { display: inline-block; background: #2563eb; color: white; padding: 0.75rem 1.5rem; border-radius: 0.6rem; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge"><span class="dot"></span> Service Status: Online</div>
+    <h1>APKify Builder API</h1>
+    <p>High-performance native Android APK builder service running Capacitor & Android SDK.</p>
+    <a href="https://apkify-builder.vercel.app" target="_blank">Open APKify Builder Web App &rarr;</a>
+  </div>
+</body>
+</html>`);
+        } else {
+          res.json({
+            service: 'APKify Builder Backend API',
+            status: 'online',
+            endpoints: {
+              health: '/api/health',
+              auth: '/api/auth',
+              build: '/api/build-apk'
+            }
+          });
+        }
       });
     }
 
