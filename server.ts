@@ -805,17 +805,30 @@ async function startServer() {
   console.log('Node Env:', process.env.NODE_ENV);
   
   try {
-    if (process.env.NODE_ENV !== 'production') {
+    const hasFrontend = existsSync(path.join(process.cwd(), 'index.html'));
+    if (hasFrontend && process.env.NODE_ENV !== 'production') {
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: 'spa',
       });
       app.use(vite.middlewares);
-    } else {
+    } else if (hasFrontend && existsSync(path.join(process.cwd(), 'dist', 'index.html'))) {
       const distPath = path.join(process.cwd(), 'dist');
       app.use(express.static(distPath));
       app.get('*', (req, res) => {
         res.sendFile(path.join(distPath, 'index.html'));
+      });
+    } else {
+      app.get('/', (req, res) => {
+        res.json({
+          service: 'APKify Builder Backend API',
+          status: 'online',
+          endpoints: {
+            health: '/api/health',
+            auth: '/api/auth',
+            build: '/api/build-apk'
+          }
+        });
       });
     }
 
