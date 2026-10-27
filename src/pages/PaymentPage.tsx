@@ -22,6 +22,11 @@ export default function PaymentPage() {
   const handlePay = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (isProd) {
+      setError('Online payments are currently locked and coming soon on the live server.');
+      return;
+    }
     
     if (parseInt(amount) !== expectedAmount) {
       setError('Invalid Amount');
@@ -83,7 +88,11 @@ export default function PaymentPage() {
           <form onSubmit={handlePay} className="p-8 space-y-6">
             <div className="flex items-center gap-3 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-xs text-blue-500/80">
               <ShieldCheck className="w-4 h-4 shrink-0" />
-              <span>Click below to activate Premium instantly and unlock all features.</span>
+              <span>
+                {isProd 
+                  ? 'Paid plans are currently locked. Enjoy 3 free APK builds every month!'
+                  : 'Click below to activate Premium instantly and unlock all features.'}
+              </span>
             </div>
             {error && <p className="text-sm text-red-400">{error}</p>}
 
@@ -96,13 +105,15 @@ export default function PaymentPage() {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 required
-                className="bg-white/5 border-white/10 text-white h-12"
+                disabled={isProd}
+                className="bg-white/5 border-white/10 text-white h-12 disabled:opacity-50"
               />
             </div>
             
             {isProd ? (
-              <div className="w-full h-14 bg-white/5 border border-white/10 text-white/50 rounded-xl font-bold text-lg flex items-center justify-center">
-                Premium Temporarily Unavailable
+              <div className="w-full p-4 bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl font-medium text-sm flex items-center justify-center gap-2">
+                <Lock className="w-4 h-4 text-amber-400" />
+                <span>Online Payments Locked • Coming Soon</span>
               </div>
             ) : (
               <Button 

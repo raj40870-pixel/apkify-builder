@@ -224,6 +224,14 @@ router.post('/upgrade', async (req: any, res: any) => {
     const user = await User.findById(decoded.id);
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
+    // Block upgrades in production unless explicitly enabled via ENABLE_PAYMENTS=true
+    if (process.env.NODE_ENV === 'production' && process.env.ENABLE_PAYMENTS !== 'true') {
+      return res.status(403).json({
+        success: false,
+        error: 'Online payments are currently locked and coming soon. Free tier with 3 APK builds is active.'
+      });
+    }
+
     const { plan } = req.body;
     
     user.plan_type = plan || 'Pro';

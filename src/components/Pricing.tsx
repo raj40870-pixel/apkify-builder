@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Check, Zap, Crown, Shield } from 'lucide-react';
+import { Check, Zap, Crown, Shield, Lock } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 
@@ -97,9 +97,17 @@ export default function Pricing({ onSelect }: PlanProps) {
             className={`group flex`}
           >
             <Card className={`glass border-white/5 flex flex-col w-full overflow-hidden relative transition-all duration-300 ${plan.glow} ${plan.popular ? 'border-blue-500/30' : ''}`}>
-              {plan.popular && (
+              {plan.popular && (!isProd || plan.isFree) && (
                 <div className="absolute top-0 right-0 p-3">
                   <span className="bg-blue-600 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full"> Popular</span>
+                </div>
+              )}
+
+              {isProd && !plan.isFree && (
+                <div className="absolute top-0 right-0 p-3">
+                  <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> Locked
+                  </span>
                 </div>
               )}
               
@@ -134,17 +142,28 @@ export default function Pricing({ onSelect }: PlanProps) {
                 <Button 
                   onClick={() => onSelect(plan.name)}
                   disabled={currentPlan === plan.name || (isProd && !plan.isFree)}
-                  className={`w-full py-4 md:py-5 rounded-xl font-bold transition-all ${
+                  className={`w-full py-4 md:py-5 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
                     currentPlan === plan.name
                     ? 'bg-white/5 text-white/40 cursor-default'
                     : (isProd && !plan.isFree)
-                    ? 'bg-white/5 text-white/30 cursor-not-allowed border border-white/10'
+                    ? 'bg-white/5 text-white/40 cursor-not-allowed border border-white/10 opacity-70'
                     : plan.popular 
                     ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:scale-[1.02] shadow-lg shadow-blue-600/20' 
                     : 'bg-white/10 hover:bg-white/20 text-white'
                   }`}
                 >
-                  {currentPlan === plan.name ? 'Current Plan' : (isProd && !plan.isFree) ? 'Temporarily Unavailable' : plan.isFree ? 'Get Started' : 'Upgrade Now'}
+                  {currentPlan === plan.name ? (
+                    'Current Plan'
+                  ) : (isProd && !plan.isFree) ? (
+                    <>
+                      <Lock className="w-4 h-4 text-amber-400" />
+                      <span>Locked • Coming Soon</span>
+                    </>
+                  ) : plan.isFree ? (
+                    'Get Started'
+                  ) : (
+                    'Upgrade Now'
+                  )}
                 </Button>
               </CardFooter>
             </Card>
