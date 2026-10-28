@@ -11,6 +11,11 @@ const otpRequestSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  type: {
+    type: String,
+    enum: ['signup', 'forgot_password'],
+    default: 'signup'
+  },
   attempts: {
     type: Number,
     default: 0
@@ -20,14 +25,13 @@ const otpRequestSchema = new mongoose.Schema({
     required: true
   },
   tempData: {
-    // We store the hashed password and name temporarily so we can create the user upon OTP success
-    password: { type: String, required: true },
-    fullName: { type: String, required: true },
-    deviceFingerprint: { type: String }
+    password: { type: String },
+    fullName: { type: String }
   }
-});
+}, { timestamps: true });
 
-// TTL index to automatically remove expired OTP documents after their expiration time
+// TTL index to automatically remove expired OTP documents
 otpRequestSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-export const OtpRequest = mongoose.model('OtpRequest', otpRequestSchema);
+export const OtpRequest = mongoose.models.OtpRequest || mongoose.model('OtpRequest', otpRequestSchema);
+export default OtpRequest;
