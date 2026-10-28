@@ -178,11 +178,78 @@ router.delete('/users/:id', requireAdmin, async (req: any, res: any) => {
   }
 });
 
-// 6. GET /api/admin/builds
+// 6. GET /api/admin/builds (With User Email and Full Name populated)
 router.get('/builds', requireAdmin, async (req: any, res: any) => {
   try {
-    const builds = await Build.find().sort({ createdAt: -1 }).limit(100);
-    return res.status(200).json({ success: true, builds });
+    const builds = await Build.find()
+      .populate('user_id', 'email fullName')
+      .sort({ created_at: -1, createdAt: -1 })
+      .limit(200);
+
+    const formattedBuilds = builds.map((b: any) => {
+      const populatedUser = b.user_id && typeof b.user_id === 'object' ? b.user_id : null;
+      return {
+        _id: b._id,
+        id: b.id,
+        apk_name: b.apk_name,
+        status: b.status,
+        downloadUrl: b.downloadUrl,
+        user_email: b.user_email || (populatedUser ? populatedUser.email : 'Unknown User'),
+        user_name: b.user_name || (populatedUser ? populatedUser.fullName : 'Guest'),
+        user_id: populatedUser ? populatedUser._id : b.user_id,
+        created_at: b.created_at || b.createdAt
+      };
+    });
+
+    return res.status(200).json({ success: true, builds: formattedBuilds });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 7. DELETE /api/admin/builds/:id (Delete individual build)
+router.delete('/builds/:id', requireAdmin, async (req: any, res: any) => {
+  try {
+    const build = await Build.findById(req.params.id);
+    if (!build) return res.status(404).json({ success: false, error: 'Build record not found' });
+
+    await Build.findByIdAndDelete(req.params.id);
+    return res.status(200).json({ success: true, message: 'Build record deleted successfully' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 8. POST /api/admin/builds/cleanup (Smart Purge of expired/broken builds)
+router.post('/builds/cleanup', requireAdmin, async (req: any, res: any) => {
+  try {
+    const result = await Build.deleteMany({
+      $or: [
+        { status: { $in: ['expired', 'Failed', 'Deleted'] } },
+        { downloadUrl: '' },
+        { downloadUrl: null },
+        { downloadUrl: '#' }
+      ]
+    });
+    return res.status(200).json({
+      success: true,
+      message: `Smart Cleanup: Removed ${result.deletedCount} junk/broken build records`,
+      deletedCount: result.deletedCount
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 9. POST /api/admin/builds/clear-all (Wipe entire build history)
+router.post('/builds/clear-all', requireAdmin, async (req: any, res: any) => {
+  try {
+    const result = await Build.deleteMany({});
+    return res.status(200).json({
+      success: true,
+      message: `Database Cleared: ${result.deletedCount} builds deleted`,
+      deletedCount: result.deletedCount
+    });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

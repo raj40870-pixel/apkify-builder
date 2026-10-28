@@ -125,6 +125,46 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteBuild = async (buildId: string, apkName: string) => {
+    if (!window.confirm(`Delete build record for: "${apkName}"?`)) return;
+    try {
+      const res = await api.delete(`/admin/builds/${buildId}`);
+      if (res.data.success) {
+        setBuilds(builds.filter(b => (b._id || b.id) !== buildId));
+        showActionToast(`Build "${apkName}" deleted`);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to delete build');
+    }
+  };
+
+  const handleCleanupBuilds = async () => {
+    if (!window.confirm('Run Smart Cleanup to remove all expired, failed, and broken build records?')) return;
+    try {
+      const res = await api.post('/admin/builds/cleanup');
+      if (res.data.success) {
+        showActionToast(res.data.message || 'Smart cleanup complete');
+        loadAdminData();
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to clean builds');
+    }
+  };
+
+  const handleClearAllBuilds = async () => {
+    if (!window.confirm('CAUTION: Are you sure you want to WIPE all APK build records from the database? This cannot be undone.')) return;
+    try {
+      const res = await api.post('/admin/builds/clear-all');
+      if (res.data.success) {
+        setBuilds([]);
+        showActionToast('All build records cleared successfully');
+        loadAdminData();
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to clear database');
+    }
+  };
+
   const handleDeleteUser = async (userId: string, email: string) => {
     if (!window.confirm(`Are you sure you want to permanently delete user: ${email}?`)) return;
     try {
@@ -446,56 +486,109 @@ export default function AdminPage() {
 
       {/* TAB 2: BUILDS HISTORY */}
       {activeTab === 'builds' && (
-        <div className="mt-6">
+        <div className="mt-6 space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/[0.02] border border-white/10 p-4 rounded-2xl">
+            <div>
+              <h3 className="font-bold text-sm text-white">APK Cloud Builds Registry</h3>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Total builds recorded: <span className="text-[#00f2fe] font-bold">{builds.length}</span> (auto-cleaned every 12h)
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCleanupBuilds}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-semibold transition-all"
+                title="Automatically purge expired/failed builds"
+              >
+                <RefreshCw className="w-3 h-3" /> Smart Cleanup
+              </button>
+              <button
+                onClick={handleClearAllBuilds}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-semibold transition-all"
+                title="Wipe all APK build records from database"
+              >
+                <Trash2 className="w-3 h-3" /> Clear All History
+              </button>
+            </div>
+          </div>
+
           <div className="glass border-white/5 rounded-3xl overflow-hidden shadow-2xl">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-white/5 border-b border-white/10 text-gray-400 uppercase tracking-wider font-semibold">
                   <tr>
                     <th className="py-4 px-6">App Name</th>
+                    <th className="py-4 px-6">Built By (User)</th>
                     <th className="py-4 px-6">Status</th>
-                    <th className="py-4 px-6">User ID</th>
                     <th className="py-4 px-6">Created Date</th>
                     <th className="py-4 px-6 text-right">Download APK</th>
+                    <th className="py-4 px-6 text-right">Delete</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 font-medium">
-                  {builds.map((b) => (
-                    <tr key={b._id || b.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-4 px-6 font-bold text-white">
-                        {b.apk_name || 'Android App'}
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 font-bold text-[10px]">
-                          {b.status || 'Completed'}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 font-mono text-gray-400 text-[11px]">
-                        {b.user_id ? String(b.user_id).slice(-8) : 'Guest'}
-                      </td>
-                      <td className="py-4 px-6 text-gray-400">
-                        {b.createdAt ? new Date(b.createdAt).toLocaleString() : 'Recent'}
-                      </td>
-                      <td className="py-4 px-6 text-right">
-                        {b.downloadUrl ? (
-                          <a
-                            href={b.downloadUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#00f2fe]/10 hover:bg-[#00f2fe]/20 text-[#00f2fe] border border-[#00f2fe]/30 font-bold text-xs transition-all"
+                  {builds.map((b) => {
+                    const buildId = b._id || b.id;
+                    const userEmail = b.user_email || (typeof b.user_id === 'object' && b.user_id?.email ? b.user_id.email : 'Unknown User');
+                    const userName = b.user_name || (typeof b.user_id === 'object' && b.user_id?.fullName ? b.user_id.fullName : '');
+
+                    return (
+                      <tr key={buildId} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="py-4 px-6 font-bold text-white">
+                          <div className="text-sm font-semibold">{b.apk_name || 'Android App'}</div>
+                          <div className="text-[10px] text-gray-500 font-mono">ID: {String(buildId).slice(-8)}</div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="font-mono text-xs font-semibold text-[#00f2fe]">{userEmail}</div>
+                          {userName && <div className="text-[10px] text-gray-400">{userName}</div>}
+                        </td>
+                        <td className="py-4 px-6">
+                          {b.status === 'Completed' ? (
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-[10px]">
+                              Completed
+                            </span>
+                          ) : b.status === 'Failed' ? (
+                            <span className="px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 font-bold text-[10px]">
+                              Failed
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-[10px]">
+                              {b.status || 'Building'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-4 px-6 text-gray-400">
+                          {b.created_at || b.createdAt ? new Date(b.created_at || b.createdAt).toLocaleString() : 'Recent'}
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          {b.downloadUrl && b.downloadUrl !== '#' ? (
+                            <a
+                              href={b.downloadUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#00f2fe]/10 hover:bg-[#00f2fe]/20 text-[#00f2fe] border border-[#00f2fe]/30 font-bold text-xs transition-all"
+                            >
+                              <Download className="w-3.5 h-3.5" /> Download
+                            </a>
+                          ) : (
+                            <span className="text-gray-500 text-[11px] italic">No Link</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-6 text-right">
+                          <button
+                            onClick={() => handleDeleteBuild(buildId, b.apk_name || 'App')}
+                            className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors"
+                            title="Delete this build record"
                           >
-                            <Download className="w-3.5 h-3.5" /> Download
-                          </a>
-                        ) : (
-                          <span className="text-gray-500 text-[11px]">No Link</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {builds.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-gray-400 text-xs">
-                        No APK builds recorded in database yet.
+                      <td colSpan={6} className="py-12 text-center text-gray-400 text-xs">
+                        No APK builds recorded in database yet. Build an app to see it here!
                       </td>
                     </tr>
                   )}

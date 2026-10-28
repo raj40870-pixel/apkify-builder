@@ -1113,6 +1113,8 @@ app.post('/api/build-apk', async (req, res) => {
           await Build.create({
             id: jobId,
             user_id: finalUserId,
+            user_email: user ? user.email : (decoded?.email || ''),
+            user_name: user ? user.fullName : '',
             apk_name: appName,
             status: 'Completed',
             downloadUrl: finalDownloadUrl
@@ -1307,6 +1309,32 @@ async function startServer() {
 
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);
+
+      // Smart automated background cleaner for expired / broken builds
+      const runSmartCleanup = async () => {
+        try {
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          const res = await Build.deleteMany({
+            $or: [
+              { status: 'expired' },
+              { status: 'Failed' },
+              { status: 'Deleted' },
+              { downloadUrl: '' },
+              { downloadUrl: null },
+              { downloadUrl: '#' },
+              { created_at: { $lt: thirtyDaysAgo } }
+            ]
+          });
+          if (res.deletedCount > 0) {
+            console.log(`[Auto-Cleanup Engine] Purged ${res.deletedCount} junk/expired build records.`);
+          }
+        } catch (err: any) {
+          console.error('[Auto-Cleanup Engine Error]:', err.message);
+        }
+      };
+      // Run 10s after startup and every 12 hours
+      setTimeout(runSmartCleanup, 10000);
+      setInterval(runSmartCleanup, 12 * 60 * 60 * 1000);
     });
   } catch (err) {
     console.error('Failed to start server:', err);
