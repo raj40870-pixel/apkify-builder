@@ -57,31 +57,6 @@ export default function AdminPage() {
     }
   };
 
-  const handleUpdateCredits = async (userId: string, currentCredits: number, delta: number) => {
-    const newCredits = Math.max(0, currentCredits + delta);
-    try {
-      const res = await api.put(`/admin/users/${userId}/credits`, { credits: newCredits });
-      if (res.data.success) {
-        setUsers(users.map(u => u._id === userId ? { ...u, credits_remaining: newCredits } : u));
-        showActionToast(`Credits updated to ${newCredits}`);
-      }
-    } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to update credits');
-    }
-  };
-
-  const handleUpdatePlan = async (userId: string, newPlan: string) => {
-    try {
-      const res = await api.put(`/admin/users/${userId}/plan`, { plan_type: newPlan });
-      if (res.data.success) {
-        setUsers(users.map(u => u._id === userId ? { ...u, plan_type: newPlan } : u));
-        showActionToast(`Plan updated to ${newPlan}`);
-      }
-    } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Failed to update plan');
-    }
-  };
-
   const handleDeleteUser = async (userId: string, email: string) => {
     if (!window.confirm(`Are you sure you want to permanently delete user: ${email}?`)) return;
     try {
@@ -258,8 +233,9 @@ export default function AdminPage() {
                     <th className="py-4 px-6">Role</th>
                     <th className="py-4 px-6">Plan</th>
                     <th className="py-4 px-6">Credits Remaining</th>
+                    <th className="py-4 px-6">Auto-Refill Cycle</th>
                     <th className="py-4 px-6">Joined Date</th>
-                    <th className="py-4 px-6 text-right">Actions</th>
+                    <th className="py-4 px-6 text-right">Account Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 font-medium">
@@ -290,61 +266,34 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td className="py-4 px-6">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm font-bold text-[#00f2fe]">
-                            {u.role === 'admin' ? '∞ Unlimited' : u.credits_remaining}
+                        <span className="font-mono text-sm font-bold text-[#00f2fe]">
+                          {u.role === 'admin' ? '∞ Unlimited' : `${u.credits_remaining} / ${u.plan_type === 'Free' ? 3 : 50}`}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        {u.role === 'admin' ? (
+                          <span className="text-gray-400 text-[11px]">N/A</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-semibold">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            15-Day Auto Refill
                           </span>
-                          {u.role !== 'admin' && (
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleUpdateCredits(u._id, u.credits_remaining, 5)}
-                                className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/15 border border-white/10 text-[10px] text-green-400"
-                                title="Add 5 Credits"
-                              >
-                                +5
-                              </button>
-                              <button
-                                onClick={() => handleUpdateCredits(u._id, u.credits_remaining, -1)}
-                                className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/15 border border-white/10 text-[10px] text-red-400"
-                                title="Deduct 1 Credit"
-                              >
-                                -1
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                        )}
                       </td>
                       <td className="py-4 px-6 text-gray-400">
                         {u.signup_date ? new Date(u.signup_date).toLocaleDateString() : 'N/A'}
                       </td>
                       <td className="py-4 px-6 text-right">
                         {u.role !== 'admin' ? (
-                          <div className="flex items-center justify-end gap-2">
-                            {u.plan_type === 'Free' ? (
-                              <button
-                                onClick={() => handleUpdatePlan(u._id, 'Pro')}
-                                className="px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[11px] font-bold"
-                              >
-                                Upgrade Pro
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleUpdatePlan(u._id, 'Free')}
-                                className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 text-[11px]"
-                              >
-                                Downgrade Free
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDeleteUser(u._id, u.email)}
-                              className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30"
-                              title="Delete Account"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => handleDeleteUser(u._id, u.email)}
+                            className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors"
+                            title="Delete Account"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         ) : (
-                          <span className="text-[11px] text-gray-500">Protected</span>
+                          <span className="text-[11px] text-gray-500 font-mono">Super Admin</span>
                         )}
                       </td>
                     </tr>

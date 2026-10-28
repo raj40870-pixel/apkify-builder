@@ -74,46 +74,7 @@ router.get('/users', requireAdmin, async (req: any, res: any) => {
   }
 });
 
-// 3. PUT /api/admin/users/:id/credits
-router.put('/users/:id/credits', requireAdmin, async (req: any, res: any) => {
-  try {
-    const { credits } = req.body;
-    if (credits === undefined || isNaN(Number(credits))) {
-      return res.status(400).json({ success: false, error: 'Valid credits number required' });
-    }
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { $set: { credits_remaining: Math.max(0, parseInt(credits, 10)) } },
-      { new: true }
-    ).select('-password');
-
-    return res.status(200).json({ success: true, user, message: 'Credits updated successfully' });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// 4. PUT /api/admin/users/:id/plan
-router.put('/users/:id/plan', requireAdmin, async (req: any, res: any) => {
-  try {
-    const { plan_type } = req.body;
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
-
-    user.plan_type = plan_type;
-    if (plan_type === 'Pro' || plan_type === 'Enterprise') {
-      user.watermark_enabled = false;
-      user.credits_remaining = Math.max(user.credits_remaining, 50);
-    }
-    await user.save();
-
-    return res.status(200).json({ success: true, user, message: 'Plan updated successfully' });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// 5. DELETE /api/admin/users/:id
+// 3. DELETE /api/admin/users/:id (Protected from self-deletion)
 router.delete('/users/:id', requireAdmin, async (req: any, res: any) => {
   try {
     if (req.params.id === req.admin._id.toString()) {
