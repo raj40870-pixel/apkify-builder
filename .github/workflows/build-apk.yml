@@ -1,0 +1,89 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: 'Build Job ID'
+        required: true
+        default: 'job_latest'
+      app_name:
+        description: 'App Name'
+        required: true
+        default: 'CompilarApp'
+      package_id:
+        description: 'Android Package ID'
+        required: true
+        default: 'com.compilar.app'
+      target_url:
+        description: 'Target Website URL'
+        required: false
+        default: 'https://compilar.vercel.app'
+      html_code:
+        description: 'Raw HTML Code'
+        required: false
+        default: ''
+      is_premium:
+        description: 'Is Premium User'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Android Release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Accept Android Licenses
+        run: |
+          mkdir -p "$ANDROID_HOME/licenses" || true
+          echo -e "\n89338d0d9b181a1ff2e1d8d76a3dd9d61f32e0c5\nd56f5187479451eabf01fb78ba6edcb13b1978f4\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$ANDROID_HOME/licenses/android-sdk-license"
+          echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+
+      - name: Execute Native APK Builder
+        id: builder
+        env:
+          JOB_ID: ${{ github.event.inputs.job_id }}
+          APP_NAME: ${{ github.event.inputs.app_name }}
+          PACKAGE_ID: ${{ github.event.inputs.package_id }}
+          TARGET_URL: ${{ github.event.inputs.target_url }}
+          HTML_CODE: ${{ github.event.inputs.html_code }}
+          IS_PREMIUM: ${{ github.event.inputs.is_premium }}
+        run: |
+          node scripts/build_runner.cjs
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.builder.outputs.apk_name }}
+          path: ${{ steps.builder.outputs.apk_path }}
+
+      - name: Publish to GitHub Releases (Public Direct Download)
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/heads/')
+        with:
+          tag_name: builds
+          name: APK Builds
+          draft: false
+          prerelease: false
+          files: ${{ steps.builder.outputs.apk_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

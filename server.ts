@@ -99,11 +99,14 @@ app.get('/api/diag', (req, res) => {
     }
   };
   try {
-    if (process.platform !== 'win32' && existsSync('/tmp/jdk-17')) {
-      info.tmpJdkExists = true;
-    }
-    if (process.platform !== 'win32' && existsSync('/tmp/android-sdk')) {
-      info.tmpSdkExists = true;
+    if (process.platform !== 'win32') {
+      info.tmpJdkExists = existsSync('/tmp/jdk-17');
+      info.tmpSdkExists = existsSync('/tmp/android-sdk');
+      info.androidSdkDirs = run('ls -la /tmp/android-sdk 2>&1');
+      info.buildToolsDirs = run('ls -la /tmp/android-sdk/build-tools 2>&1');
+      info.lastDaemonLog = run('cat /tmp/.gradle/daemon/*/*.out.log 2>&1 | tail -n 40');
+      info.jvmCrashReports = run('ls -la /tmp/hs_err*.log ./hs_err*.log 2>&1');
+      info.aapt2Check = run('/tmp/android-sdk/build-tools/34.0.0/aapt2 version 2>&1');
     }
   } catch (_) {}
   res.json(info);
@@ -234,6 +237,129 @@ async function ensureLinuxJavaAndSdk(sendProgress: (p: number, s: string) => voi
 
   process.env.PATH = `${sdkHome}/cmdline-tools/latest/bin:${sdkHome}/platform-tools:${process.env.PATH}`;
   console.log('[AutoSdk] Android SDK ready at:', sdkHome);
+}
+
+async function buildApkViaGitHubActions(
+  jobId: string,
+  url: string,
+  appName: string,
+  packageId: string,
+  sendProgress: (p: number, s: string, extra?: any) => void,
+  htmlCode?: string,
+  isPremium: boolean = false
+) {
+  const token = process.env.GITHUB_TOKEN;
+  const repoOwner = process.env.GITHUB_REPO_OWNER || 'raj40870-pixel';
+  const repoName = process.env.GITHUB_REPO_NAME || 'apk-backend-';
+
+  if (!token) {
+    throw new Error('GITHUB_TOKEN environment variable is not configured on server.');
+  }
+
+  sendProgress(10, 'Triggering GitHub Actions 16GB Cloud Runner...');
+
+  const dispatchUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/build-apk.yml/dispatches`;
+  const dispatchRes = await fetch(dispatchUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'APKify-Builder'
+    },
+    body: JSON.stringify({
+      ref: 'main',
+      inputs: {
+        job_id: jobId,
+        app_name: appName,
+        package_id: packageId,
+        target_url: url,
+        html_code: htmlCode || '',
+        is_premium: isPremium ? 'true' : 'false'
+      }
+    })
+  });
+
+  if (!dispatchRes.ok) {
+    const errText = await dispatchRes.text();
+    throw new Error(`Failed to trigger GitHub Actions: ${dispatchRes.status} ${errText}`);
+  }
+
+  sendProgress(20, 'GitHub Actions workflow started. Provisioning Android SDK & Java 17...');
+
+  const runsUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs?event=workflow_dispatch&per_page=5`;
+  let workflowRunId: number | null = null;
+  const startTime = Date.now();
+
+  while (!workflowRunId && Date.now() - startTime < 60000) {
+    await new Promise(r => setTimeout(r, 4000));
+    try {
+      const runsRes = await fetch(runsUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'APKify-Builder'
+        }
+      });
+      if (runsRes.ok) {
+        const runsData: any = await runsRes.json();
+        const latestRun = runsData.workflow_runs?.[0];
+        if (latestRun && new Date(latestRun.created_at).getTime() >= startTime - 15000) {
+          workflowRunId = latestRun.id;
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (!workflowRunId) {
+    throw new Error('Timed out waiting for GitHub Actions workflow to start.');
+  }
+
+  const singleRunUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${workflowRunId}`;
+  let status = 'in_progress';
+  let conclusion: string | null = null;
+  let progressStep = 30;
+
+  while (status !== 'completed' && Date.now() - startTime < 360000) {
+    await new Promise(r => setTimeout(r, 5000));
+    try {
+      const runCheck = await fetch(singleRunUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'APKify-Builder'
+        }
+      });
+      if (runCheck.ok) {
+        const runObj: any = await runCheck.json();
+        status = runObj.status;
+        conclusion = runObj.conclusion;
+        if (status === 'in_progress') {
+          progressStep = Math.min(progressStep + 8, 88);
+          if (progressStep <= 45) sendProgress(progressStep, 'Setting up Android SDK 34 & Capacitor platform...');
+          else if (progressStep <= 70) sendProgress(progressStep, 'Compiling Release APK with Gradle on 16GB runner...');
+          else sendProgress(progressStep, 'Signing and packaging Release APK...');
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (conclusion !== 'success') {
+    throw new Error(`GitHub Actions build ${conclusion || 'failed'}.`);
+  }
+
+  sendProgress(95, 'Finalizing APK download URL...');
+
+  const sanitizedAppName = appName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const finalApkName = `${sanitizedAppName}.apk`;
+  const directDownloadUrl = `https://github.com/${repoOwner}/${repoName}/releases/download/builds/${finalApkName}`;
+
+  sendProgress(100, 'Completed', {
+    success: true,
+    downloadUrl: directDownloadUrl
+  });
+
+  return directDownloadUrl;
 }
 
 async function buildApkLocally(
@@ -376,7 +502,8 @@ async function buildApkLocally(
 
       const env: any = {
         ...process.env,
-        GRADLE_OPTS: `${sslOpts} -Xmx1280m -Dorg.gradle.jvmargs=-Xmx1280m -Dkotlin.compiler.execution.strategy=in-process`
+        GRADLE_USER_HOME: isWin ? (process.env.GRADLE_USER_HOME || path.join(os.homedir(), '.gradle')) : '/tmp/.gradle',
+        GRADLE_OPTS: `${sslOpts} -Dorg.gradle.daemon=false -Dorg.gradle.parallel=false -Dorg.gradle.workers.max=1 -Xmx220m -XX:MaxMetaspaceSize=96m -XX:+UseSerialGC -Dkotlin.compiler.execution.strategy=in-process`
       };
       if (javaHome) {
         env.JAVA_HOME = javaHome;
@@ -648,7 +775,8 @@ public class SplashActivity extends Activity {
           await fs.writeFile(buildKeystorePath, Buffer.from(placeholderKeystoreB64, 'base64'));
         }
         
-        propsContent += `\nRELEASE_STORE_FILE=release.keystore\nRELEASE_STORE_PASSWORD=android\nRELEASE_KEY_ALIAS=key0\nRELEASE_KEY_PASSWORD=android\nandroid.builder.sdkDownload=true\n`;
+        propsContent = propsContent.replace(/org\.gradle\..*/g, '');
+        propsContent += `\norg.gradle.daemon=false\norg.gradle.parallel=false\norg.gradle.workers.max=1\norg.gradle.vfs.watch=false\nkotlin.compiler.execution.strategy=in-process\norg.gradle.jvmargs=-Xmx220m -XX:MaxMetaspaceSize=96m -XX:+UseSerialGC -Dfile.encoding=UTF-8\nRELEASE_STORE_FILE=release.keystore\nRELEASE_STORE_PASSWORD=android\nRELEASE_KEY_ALIAS=key0\nRELEASE_KEY_PASSWORD=android\nandroid.builder.sdkDownload=true\n`;
         await fs.writeFile(gradlePropsFile, propsContent);
 
         const appBuildGradleFile = path.join(tempDir, 'android', 'app', 'build.gradle');
@@ -713,11 +841,17 @@ public class SplashActivity extends Activity {
       } catch (_) {}
     }
     sendProgress(70, "Compiling and packaging Android release APK...");
+    if (process.platform !== 'win32') {
+      await fs.mkdir('/tmp/.gradle', { recursive: true }).catch(() => {});
+    }
     const gradleCmd = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
     const gradleArgs = [
       'assembleRelease',
       '--no-daemon',
-      '-Dorg.gradle.jvmargs=-Xmx1280m',
+      '--no-parallel',
+      '--max-workers=1',
+      '-Dorg.gradle.daemon=false',
+      '-Dorg.gradle.jvmargs=-Xmx220m -XX:MaxMetaspaceSize=96m -XX:+UseSerialGC',
       '-Dkotlin.compiler.execution.strategy=in-process'
     ];
     // Ensure local.properties and licenses exist for Gradle
@@ -913,18 +1047,25 @@ app.post('/api/build-apk', async (req, res) => {
 
     const isPremiumDB = user ? !user.watermark_enabled : false;
     
-    buildApkLocally(jobId, url || '', appName, packageId, iconUrl, sendProgress, htmlCode, zipData, isPremiumDB)
-      .then(async () => {
+    const buildRunner = process.env.GITHUB_TOKEN
+      ? buildApkViaGitHubActions(jobId, url || '', appName, packageId, sendProgress, htmlCode, isPremiumDB)
+      : buildApkLocally(jobId, url || '', appName, packageId, iconUrl, sendProgress, htmlCode, zipData, isPremiumDB);
+
+    buildRunner
+      .then(async (resultUrl) => {
         // Build successful, add to history
         if (finalUserId) {
-          
           const apkFilename = `${appName.replace(/[^a-zA-Z0-9_]/g, '_')}.apk`;
+          const finalDownloadUrl = (typeof resultUrl === 'string' && resultUrl.startsWith('http'))
+            ? resultUrl
+            : `/apks/${apkFilename}`;
+
           await Build.create({
             id: jobId,
             user_id: finalUserId,
             apk_name: appName,
             status: 'Completed',
-            downloadUrl: `/apks/${apkFilename}`
+            downloadUrl: finalDownloadUrl
           }).catch((err) => console.error('[API] Failed to save build history:', err));
           
           if (user) {

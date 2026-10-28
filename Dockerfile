@@ -4,7 +4,7 @@ FROM node:20-bookworm-slim
 # Prevent interactive prompts during package install
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install OpenJDK 17, curl, unzip and dependencies needed for Android SDK
+# Install OpenJDK 17, curl, unzip, git and dependencies needed for Android SDK
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openjdk-17-jdk-headless \
     ca-certificates \
@@ -30,6 +30,10 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools \
     && yes | sdkmanager --licenses \
     && sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
+# Set up user with full write permissions
+RUN useradd -m -u 1000 user || true
+RUN chmod -R 777 ${ANDROID_HOME}
+
 # Set working directory
 WORKDIR /app
 
@@ -42,18 +46,19 @@ RUN npm install
 # Copy application source code
 COPY . .
 
-# Build Vite frontend and bundled backend server
+# Build bundled backend server
 RUN npm run build
 
-# Default environment configuration for Google Cloud Run
+# Ensure write permissions for apks and temp directory
+RUN mkdir -p /app/apks /app/worker-temp && chmod -R 777 /app
+
+# Environment configuration (Render uses 10000 by default, Cloud Run 8080)
 ENV NODE_ENV=production
-ENV PORT=8080
+ENV PORT=10000
 
-# Ensure apks directory exists for downloads
-RUN mkdir -p apks
+EXPOSE 10000 8080 7860 3000
 
-# Cloud Run default port
-EXPOSE 8080
+USER user
 
 # Start the built production server
 CMD ["npm", "start"]
