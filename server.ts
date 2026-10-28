@@ -53,7 +53,12 @@ const app = express();
 mkdirSync(path.join(process.cwd(), 'apks'), { recursive: true });
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+app.options('*', cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/apks', express.static(path.join(process.cwd(), 'apks')));
@@ -1027,7 +1032,8 @@ app.post('/api/build-apk', async (req, res) => {
     });
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Transfer-Encoding', 'chunked');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
 
     let lastSentProgress = 0;
     const sendProgress = (progress: number, stage: string, extra = {}) => {

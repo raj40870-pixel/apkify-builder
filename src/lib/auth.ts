@@ -19,7 +19,7 @@ const safeJson = async (res: Response): Promise<any> => {
 
 export const getAuthToken = () => {
   if (!isBrowser()) return null;
-  return localStorage.getItem('authToken');
+  return localStorage.getItem('authToken') || localStorage.getItem('token');
 };
 
 export const fetchMe = async () => {
