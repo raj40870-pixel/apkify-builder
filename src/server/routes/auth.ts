@@ -358,6 +358,32 @@ router.post('/login', async (req: any, res: any) => {
 
     user = await checkExpiry(user);
 
+    // Moderation Checks (Ban / 24h Suspension)
+    if (user.role !== 'admin') {
+      if (user.status === 'banned') {
+        return res.status(403).json({
+          success: false,
+          error: `Account Banned: This account has been permanently suspended due to violation of platform terms. Reason: ${user.violation_reason || 'Terms of Service violation'}.`
+        });
+      }
+
+      if (user.status === 'suspended' && user.suspended_until) {
+        if (new Date() < new Date(user.suspended_until)) {
+          const remainingHours = Math.ceil((new Date(user.suspended_until).getTime() - Date.now()) / (1000 * 60 * 60));
+          return res.status(403).json({
+            success: false,
+            error: `Account Temporarily Suspended: Your account is suspended for 24 hours (approx ${remainingHours}h remaining) until ${new Date(user.suspended_until).toLocaleString()}. Reason: ${user.violation_reason || 'Administrative timeout'}.`
+          });
+        } else {
+          // 24 hours elapsed! Auto-lift suspension!
+          user.status = 'active';
+          user.suspended_until = null;
+          user.violation_reason = '';
+          await user.save();
+        }
+      }
+    }
+
     // Mandatory 2FA OTP for Super Admin
     if (user.role === 'admin') {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -493,6 +519,22 @@ router.get('/me', async (req: any, res: any) => {
     
     user = await checkExpiry(user);
 
+    if (user.role !== 'admin') {
+      if (user.status === 'banned') {
+        return res.status(403).json({ success: false, error: 'Account Banned' });
+      }
+      if (user.status === 'suspended' && user.suspended_until) {
+        if (new Date() < new Date(user.suspended_until)) {
+          return res.status(403).json({ success: false, error: 'Account Temporarily Suspended' });
+        } else {
+          user.status = 'active';
+          user.suspended_until = null;
+          user.violation_reason = '';
+          await user.save();
+        }
+      }
+    }
+
     return res.status(200).json({
       success: true,
       user: {
@@ -500,6 +542,10 @@ router.get('/me', async (req: any, res: any) => {
         name: user.fullName,
         email: user.email,
         role: user.role || 'user',
+        status: user.status || 'active',
+        suspended_until: user.suspended_until,
+        violation_reason: user.violation_reason,
+        violation_flags: user.violation_flags || [],
         credits_remaining: user.credits_remaining,
         history_limit: user.history_limit,
         plan: user.plan_type,

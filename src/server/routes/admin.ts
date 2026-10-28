@@ -74,7 +74,98 @@ router.get('/users', requireAdmin, async (req: any, res: any) => {
   }
 });
 
-// 3. DELETE /api/admin/users/:id (Protected from self-deletion)
+// 3. PUT /api/admin/users/:id/suspend-24h
+router.put('/users/:id/suspend-24h', requireAdmin, async (req: any, res: any) => {
+  try {
+    if (req.params.id === req.admin._id.toString()) {
+      return res.status(400).json({ success: false, error: 'Cannot suspend own Super Admin account' });
+    }
+    const { reason } = req.body;
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    user.status = 'suspended';
+    user.suspended_until = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    user.violation_reason = reason || '24-hour temporary timeout for policy violation';
+    user.suspension_count = (user.suspension_count || 0) + 1;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `User ${user.email} suspended for 24 hours until ${user.suspended_until.toLocaleString()}`,
+      user
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4. PUT /api/admin/users/:id/ban
+router.put('/users/:id/ban', requireAdmin, async (req: any, res: any) => {
+  try {
+    if (req.params.id === req.admin._id.toString()) {
+      return res.status(400).json({ success: false, error: 'Cannot ban own Super Admin account' });
+    }
+    const { reason } = req.body;
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    user.status = 'banned';
+    user.suspended_until = null;
+    user.violation_reason = reason || 'Account permanently banned for Terms of Service violation';
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `User ${user.email} has been permanently banned`,
+      user
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5. PUT /api/admin/users/:id/unban
+router.put('/users/:id/unban', requireAdmin, async (req: any, res: any) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    user.status = 'active';
+    user.suspended_until = null;
+    user.violation_reason = '';
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `User ${user.email} has been unbanned and restored to Active`,
+      user
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6. PUT /api/admin/users/:id/clear-flags
+router.put('/users/:id/clear-flags', requireAdmin, async (req: any, res: any) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    user.violation_flags = [];
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Violation flags cleared for ${user.email}`,
+      user
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 7. DELETE /api/admin/users/:id (Protected from self-deletion)
 router.delete('/users/:id', requireAdmin, async (req: any, res: any) => {
   try {
     if (req.params.id === req.admin._id.toString()) {

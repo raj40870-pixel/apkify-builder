@@ -1010,6 +1010,48 @@ app.post('/api/build-apk', async (req, res) => {
     const finalUserId = user ? user._id : userId;
     console.log('[API] /build-apk Build will be assigned to user ID:', finalUserId);
     
+    // CHECK 0 - Moderation Check (Banned or Suspended)
+    if (user && user.role !== 'admin') {
+      if (user.status === 'banned') {
+        return res.status(403).json({
+          success: false,
+          error: `Build Blocked: Your account has been permanently banned due to violation of platform terms. Reason: ${user.violation_reason || 'Terms violation'}.`
+        });
+      }
+      if (user.status === 'suspended' && user.suspended_until) {
+        if (new Date() < new Date(user.suspended_until)) {
+          const remainingHours = Math.ceil((new Date(user.suspended_until).getTime() - Date.now()) / (1000 * 60 * 60));
+          return res.status(403).json({
+            success: false,
+            error: `Build Blocked: Your account is temporarily suspended (approx ${remainingHours}h remaining) until ${new Date(user.suspended_until).toLocaleString()}. Reason: ${user.violation_reason || 'Administrative timeout'}.`
+          });
+        } else {
+          // Auto-restore
+          user.status = 'active';
+          user.suspended_until = null;
+          user.violation_reason = '';
+          await user.save();
+        }
+      }
+
+      // Automated Risk & Abuse Flag Detection
+      const riskFlags: string[] = [];
+      const suspiciousTerms = ['phish', 'login-fake', 'hack', 'free-crypto', 'free-recharge', 'scam', 'betting', 'casino'];
+      const targetUrl = (webUrl || '').toLowerCase();
+      if (suspiciousTerms.some(term => targetUrl.includes(term))) {
+        riskFlags.push(`⚠️ Suspicious URL: ${webUrl.substring(0, 30)}...`);
+      }
+      const pkg = (packageName || '').toLowerCase();
+      if (pkg.startsWith('com.google.') || pkg.startsWith('com.whatsapp.') || pkg.startsWith('com.sbi.') || pkg.startsWith('com.paytm.')) {
+        riskFlags.push(`⚠️ Spoofing Package: ${packageName}`);
+      }
+
+      if (riskFlags.length > 0) {
+        user.violation_flags = Array.from(new Set([...(user.violation_flags || []), ...riskFlags]));
+        await user.save();
+      }
+    }
+
     // CHECK 1 - Credit Check
     if (user && user.role !== 'admin' && user.credits_remaining <= 0) {
       return res.status(403).json({ success: false, error: 'Your APK Build Credits have been exhausted. Please wait for your Free Plan renewal or upgrade to a Premium Plan.' });

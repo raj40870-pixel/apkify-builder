@@ -12,6 +12,11 @@ export interface IUser extends Document {
   plan_expiry_date?: Date;
   last_credit_refill: Date;
   watermark_enabled: boolean;
+  status: 'active' | 'suspended' | 'banned';
+  suspended_until?: Date | null;
+  violation_reason?: string;
+  violation_flags: string[];
+  suspension_count: number;
 }
 
 const userSchema = new mongoose.Schema<IUser>({
@@ -61,6 +66,27 @@ const userSchema = new mongoose.Schema<IUser>({
   watermark_enabled: {
     type: Boolean,
     default: true
+  },
+  status: {
+    type: String,
+    enum: ['active', 'suspended', 'banned'],
+    default: 'active'
+  },
+  suspended_until: {
+    type: Date,
+    default: null
+  },
+  violation_reason: {
+    type: String,
+    default: ''
+  },
+  violation_flags: {
+    type: [String],
+    default: []
+  },
+  suspension_count: {
+    type: Number,
+    default: 0
   }
 });
 

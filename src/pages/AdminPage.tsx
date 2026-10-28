@@ -57,6 +57,74 @@ export default function AdminPage() {
     }
   };
 
+  const handleSuspendUser = async (userId: string, email: string) => {
+    const reason = window.prompt(`Enter 24-Hour Suspension reason for ${email}:`, '24-hour temporary timeout for policy violation');
+    if (reason === null) return;
+    try {
+      const res = await api.put(`/admin/users/${userId}/suspend-24h`, { reason });
+      if (res.data.success) {
+        setUsers(users.map(u => u._id === userId ? { 
+          ...u, 
+          status: 'suspended', 
+          suspended_until: res.data.user?.suspended_until || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          violation_reason: reason 
+        } : u));
+        showActionToast(`User ${email} suspended for 24 hours`);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to suspend user');
+    }
+  };
+
+  const handleBanUser = async (userId: string, email: string) => {
+    const reason = window.prompt(`Enter Permanent Ban reason for ${email}:`, 'Violation of platform Terms of Service');
+    if (reason === null) return;
+    try {
+      const res = await api.put(`/admin/users/${userId}/ban`, { reason });
+      if (res.data.success) {
+        setUsers(users.map(u => u._id === userId ? { 
+          ...u, 
+          status: 'banned', 
+          suspended_until: null,
+          violation_reason: reason 
+        } : u));
+        showActionToast(`User ${email} has been permanently banned`);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to ban user');
+    }
+  };
+
+  const handleUnbanUser = async (userId: string, email: string) => {
+    if (!window.confirm(`Restore and reactivate user ${email}?`)) return;
+    try {
+      const res = await api.put(`/admin/users/${userId}/unban`);
+      if (res.data.success) {
+        setUsers(users.map(u => u._id === userId ? { 
+          ...u, 
+          status: 'active', 
+          suspended_until: null,
+          violation_reason: '' 
+        } : u));
+        showActionToast(`User ${email} restored to Active`);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to unban user');
+    }
+  };
+
+  const handleClearFlags = async (userId: string, email: string) => {
+    try {
+      const res = await api.put(`/admin/users/${userId}/clear-flags`);
+      if (res.data.success) {
+        setUsers(users.map(u => u._id === userId ? { ...u, violation_flags: [] } : u));
+        showActionToast(`Safety flags cleared for ${email}`);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to clear flags');
+    }
+  };
+
   const handleDeleteUser = async (userId: string, email: string) => {
     if (!window.confirm(`Are you sure you want to permanently delete user: ${email}?`)) return;
     try {
@@ -230,12 +298,12 @@ export default function AdminPage() {
                 <thead className="bg-white/5 border-b border-white/10 text-gray-400 uppercase tracking-wider font-semibold">
                   <tr>
                     <th className="py-4 px-6">User</th>
-                    <th className="py-4 px-6">Role</th>
+                    <th className="py-4 px-6">Status / Flags</th>
                     <th className="py-4 px-6">Plan</th>
                     <th className="py-4 px-6">Credits Remaining</th>
                     <th className="py-4 px-6">Auto-Refill Cycle</th>
                     <th className="py-4 px-6">Joined Date</th>
-                    <th className="py-4 px-6 text-right">Account Actions</th>
+                    <th className="py-4 px-6 text-right">Moderation Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 font-medium">
@@ -244,15 +312,51 @@ export default function AdminPage() {
                       <td className="py-4 px-6">
                         <div className="font-bold text-white text-sm">{u.fullName || 'No Name'}</div>
                         <div className="text-gray-400 text-xs font-mono">{u.email}</div>
+                        {u.violation_flags && u.violation_flags.length > 0 && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {u.violation_flags.map((flag: string, idx: number) => (
+                              <span key={idx} className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 font-medium border border-red-500/30">
+                                {flag}
+                              </span>
+                            ))}
+                            <button
+                              onClick={() => handleClearFlags(u._id, u.email)}
+                              className="text-[9px] text-gray-400 hover:text-white underline ml-1"
+                              title="Dismiss safety flags"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        )}
                       </td>
                       <td className="py-4 px-6">
                         {u.role === 'admin' ? (
-                          <span className="px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-[10px]">
+                          <span className="px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 font-bold text-[10px]">
                             Super Admin
                           </span>
+                        ) : u.status === 'banned' ? (
+                          <div>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 font-bold text-[10px]">
+                              🔴 Banned
+                            </span>
+                            {u.violation_reason && (
+                              <div className="text-[9px] text-red-300/80 mt-1 max-w-[140px] truncate" title={u.violation_reason}>
+                                {u.violation_reason}
+                              </div>
+                            )}
+                          </div>
+                        ) : u.status === 'suspended' && u.suspended_until && new Date(u.suspended_until) > new Date() ? (
+                          <div>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 font-bold text-[10px]">
+                              🟡 Suspended (24h)
+                            </span>
+                            <div className="text-[9px] text-amber-300/80 mt-1">
+                              Until: {new Date(u.suspended_until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
                         ) : (
-                          <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 text-[10px]">
-                            User
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold text-[10px]">
+                            🟢 Active
                           </span>
                         )}
                       </td>
@@ -285,13 +389,41 @@ export default function AdminPage() {
                       </td>
                       <td className="py-4 px-6 text-right">
                         {u.role !== 'admin' ? (
-                          <button
-                            onClick={() => handleDeleteUser(u._id, u.email)}
-                            className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors"
-                            title="Delete Account"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {u.status === 'banned' ? (
+                              <button
+                                onClick={() => handleUnbanUser(u._id, u.email)}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold transition-all"
+                                title="Reactivate user"
+                              >
+                                Unban
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleSuspendUser(u._id, u.email)}
+                                  className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-semibold transition-all"
+                                  title="Suspend account for 24 hours"
+                                >
+                                  24h Timeout
+                                </button>
+                                <button
+                                  onClick={() => handleBanUser(u._id, u.email)}
+                                  className="px-2 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-[10px] font-bold transition-all"
+                                  title="Permanently ban user"
+                                >
+                                  Ban
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => handleDeleteUser(u._id, u.email)}
+                              className="p-1 rounded-lg bg-white/5 hover:bg-red-500/10 text-gray-400 hover:text-red-400 border border-white/10 transition-colors ml-1"
+                              title="Delete Account"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-[11px] text-gray-500 font-mono">Super Admin</span>
                         )}
