@@ -16,6 +16,7 @@ import os from 'os';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import authRoutes from './src/server/routes/auth.js';
+import adminRoutes from './src/server/routes/admin.js';
 import jwt from 'jsonwebtoken';
 import User from './src/server/models/User.js';
 import Build from './src/server/models/Build.js';
@@ -65,6 +66,7 @@ app.use('/apks', express.static(path.join(process.cwd(), 'apks')));
 
 // Mount Auth Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 // Request logging
 app.use((req, res, next) => {
   console.log(`[API] ${req.method} ${req.url}`);
@@ -1009,12 +1011,12 @@ app.post('/api/build-apk', async (req, res) => {
     console.log('[API] /build-apk Build will be assigned to user ID:', finalUserId);
     
     // CHECK 1 - Credit Check
-    if (user && user.credits_remaining <= 0) {
+    if (user && user.role !== 'admin' && user.credits_remaining <= 0) {
       return res.status(403).json({ success: false, error: 'Your APK Build Credits have been exhausted. Please wait for your Free Plan renewal or upgrade to a Premium Plan.' });
     }
 
     // CHECK 2 - History Limit Check
-    if (user && finalUserId) {
+    if (user && user.role !== 'admin' && finalUserId) {
       const buildCount = await Build.countDocuments({ user_id: finalUserId });
       if (buildCount >= user.history_limit) {
         return res.status(403).json({ success: false, error: 'Storage is Full. Delete old APK History to continue.' });
@@ -1051,7 +1053,7 @@ app.post('/api/build-apk', async (req, res) => {
 
     sendProgress(5, "Starting local environment...");
 
-    const isPremiumDB = user ? !user.watermark_enabled : false;
+    const isPremiumDB = (user && user.role === 'admin') ? true : (user ? !user.watermark_enabled : false);
     
     const buildRunner = process.env.GITHUB_TOKEN
       ? buildApkViaGitHubActions(jobId, url || '', appName, packageId, sendProgress, htmlCode, isPremiumDB)

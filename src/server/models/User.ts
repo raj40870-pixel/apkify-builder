@@ -4,6 +4,7 @@ export interface IUser extends Document {
   email: string;
   password?: string;
   fullName: string;
+  role: 'user' | 'admin';
   credits_remaining: number;
   history_limit: number;
   plan_type: string;
@@ -28,6 +29,11 @@ const userSchema = new mongoose.Schema<IUser>({
   fullName: {
     type: String,
     default: 'Appify User'
+  },
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
   },
   credits_remaining: {
     type: Number,
@@ -58,5 +64,5 @@ const userSchema = new mongoose.Schema<IUser>({
   }
 });
 
-const User = mongoose.model<IUser>('User', userSchema);
+export const User = mongoose.models.User || mongoose.model<IUser>('User', userSchema);
 export default User;

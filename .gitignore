@@ -26,3 +26,6 @@ users-cache.json
 # Build output and temp
 worker-temp/
 apks/
+scratch/
+test_live_apk.cjs
+scripts/

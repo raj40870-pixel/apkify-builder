@@ -11,6 +11,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import PaymentPage from './pages/PaymentPage';
 import TermsPage from './pages/TermsPage';
 import AboutPage from './pages/AboutPage';
+import AdminPage from './pages/AdminPage';
 import { User, Build } from './types';
 
 // Protected Route Component
@@ -115,6 +116,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <DashboardPage user={getFullUser(user)!} builds={builds} onLogout={handleLogout} />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin" 
+              element={
+                <ProtectedRoute>
+                  <AdminPage />
                 </ProtectedRoute>
               } 
             />

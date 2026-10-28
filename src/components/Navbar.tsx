@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Cpu, LogIn, UserCircle, LogOut, ChevronDown, Wrench } from 'lucide-react';
+import { Cpu, LogIn, UserCircle, LogOut, ChevronDown, Wrench, ShieldCheck } from 'lucide-react';
 import { Button } from './ui/button';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -55,8 +55,24 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
                   >
                     <div className="p-3 mb-1 border-b border-white/5">
                       <p className="text-sm font-bold truncate">{user.displayName}</p>
+                      {user.role === 'admin' && (
+                        <span className="inline-block mt-0.5 text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono font-bold tracking-wider">
+                          SUPER ADMIN
+                        </span>
+                      )}
                       <p className="text-[10px] text-white/40 truncate">{user.email}</p>
                     </div>
+
+{user.role === 'admin' && (
+                      <Link 
+                        to="/admin" 
+                        onClick={() => setShowDropdown(false)}
+                        className="flex items-center gap-3 p-3 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 text-sm font-semibold transition-colors group mb-1 border border-purple-500/20"
+                      >
+                        <ShieldCheck className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+                        Admin Panel
+                      </Link>
+                    )}
 
                     <Link 
                       to="/accounts/dashboard" 

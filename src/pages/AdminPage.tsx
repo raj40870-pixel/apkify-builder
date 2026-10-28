@@ -1,0 +1,429 @@
+import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
+import { 
+  Users, Smartphone, ShieldCheck, Zap, HardDrive, 
+  Search, Plus, Trash2, ArrowUpRight, Download, RefreshCw, 
+  AlertCircle, CheckCircle2, Crown, Activity, Key
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import api from '../lib/api';
+
+export default function AdminPage() {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<any>(null);
+  const [users, setUsers] = useState<any[]>([]);
+  const [builds, setBuilds] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'users' | 'builds' | 'system'>('users');
+  const [actionMsg, setActionMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Current logged in user check
+  const currentUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('user') || '{}');
+    } catch {
+      return {};
+    }
+  })();
+
+  // Verify Admin Access
+  useEffect(() => {
+    if (currentUser?.role !== 'admin') {
+      navigate('/build', { replace: true });
+      return;
+    }
+    loadAdminData();
+  }, []);
+
+  const loadAdminData = async () => {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      const [statsRes, usersRes, buildsRes] = await Promise.all([
+        api.get('/admin/stats').catch(() => ({ data: { stats: null } })),
+        api.get('/admin/users').catch(() => ({ data: { users: [] } })),
+        api.get('/admin/builds').catch(() => ({ data: { builds: [] } }))
+      ]);
+
+      if (statsRes.data?.stats) setStats(statsRes.data.stats);
+      if (usersRes.data?.users) setUsers(usersRes.data.users);
+      if (buildsRes.data?.builds) setBuilds(buildsRes.data.builds);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to fetch admin data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateCredits = async (userId: string, currentCredits: number, delta: number) => {
+    const newCredits = Math.max(0, currentCredits + delta);
+    try {
+      const res = await api.put(`/admin/users/${userId}/credits`, { credits: newCredits });
+      if (res.data.success) {
+        setUsers(users.map(u => u._id === userId ? { ...u, credits_remaining: newCredits } : u));
+        showActionToast(`Credits updated to ${newCredits}`);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to update credits');
+    }
+  };
+
+  const handleUpdatePlan = async (userId: string, newPlan: string) => {
+    try {
+      const res = await api.put(`/admin/users/${userId}/plan`, { plan_type: newPlan });
+      if (res.data.success) {
+        setUsers(users.map(u => u._id === userId ? { ...u, plan_type: newPlan } : u));
+        showActionToast(`Plan updated to ${newPlan}`);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to update plan');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, email: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete user: ${email}?`)) return;
+    try {
+      const res = await api.delete(`/admin/users/${userId}`);
+      if (res.data.success) {
+        setUsers(users.filter(u => u._id !== userId));
+        showActionToast(`User ${email} deleted successfully`);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to delete user');
+    }
+  };
+
+  const showActionToast = (msg: string) => {
+    setActionMsg(msg);
+    setTimeout(() => setActionMsg(''), 3000);
+  };
+
+  const filteredUsers = users.filter(u => 
+    u.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    u.fullName?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="min-h-screen pt-24 pb-16 px-4 sm:px-6 lg:px-8 text-white max-w-7xl mx-auto">
+      {/* HEADER BANNER */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between pb-8 border-b border-white/10 gap-4">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold mb-2">
+            <ShieldCheck className="w-4 h-4" /> Super Admin Portal
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">
+            APKify Control Center
+          </h1>
+          <p className="text-gray-400 text-sm mt-1">
+            Logged in as <span className="text-white font-semibold">{currentUser?.email}</span> (Unlimited Access)
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={loadAdminData}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold transition-all"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh Data
+          </button>
+          <button 
+            onClick={() => navigate('/build')}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#00f2fe] to-[#4facfe] text-black font-bold text-xs shadow-lg shadow-[#00f2fe]/20 hover:opacity-95 transition-all"
+          >
+            <Smartphone className="w-4 h-4" /> Open APK Builder
+          </button>
+        </div>
+      </div>
+
+      {/* TOASTS */}
+      {actionMsg && (
+        <div className="mt-4 p-3 bg-green-500/10 border border-green-500/30 text-green-400 rounded-xl text-xs flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" /> {actionMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {errorMsg}
+        </div>
+      )}
+
+      {/* STATS OVERVIEW CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+        <div className="glass p-6 rounded-3xl border-white/5 relative overflow-hidden">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs uppercase tracking-wider font-semibold text-gray-400">Total Users</p>
+              <h3 className="text-3xl font-black mt-2">{stats?.totalUsers ?? users.length}</h3>
+            </div>
+            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-blue-400">
+              <Users className="w-5 h-5" />
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-4 flex items-center gap-1">
+            <span className="text-green-400 font-bold">{stats?.proUsers ?? 0} Pro</span> users
+          </p>
+        </div>
+
+        <div className="glass p-6 rounded-3xl border-white/5 relative overflow-hidden">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs uppercase tracking-wider font-semibold text-gray-400">Total APKs Built</p>
+              <h3 className="text-3xl font-black mt-2">{stats?.totalBuilds ?? builds.length}</h3>
+            </div>
+            <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-2xl text-purple-400">
+              <Smartphone className="w-5 h-5" />
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-4 flex items-center gap-1">
+            <span className="text-[#00f2fe] font-bold">+{stats?.buildsToday ?? 0}</span> built today
+          </p>
+        </div>
+
+        <div className="glass p-6 rounded-3xl border-white/5 relative overflow-hidden">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs uppercase tracking-wider font-semibold text-gray-400">Cloud Runner</p>
+              <h3 className="text-2xl font-black mt-2 text-green-400">16GB Active</h3>
+            </div>
+            <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-2xl text-green-400">
+              <Zap className="w-5 h-5" />
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-4">GitHub Actions 24/7 Engine</p>
+        </div>
+
+        <div className="glass p-6 rounded-3xl border-white/5 relative overflow-hidden">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs uppercase tracking-wider font-semibold text-gray-400">Backend API</p>
+              <h3 className="text-2xl font-black mt-2 text-[#00f2fe]">Online (200)</h3>
+            </div>
+            <div className="p-3 bg-[#00f2fe]/10 border border-[#00f2fe]/20 rounded-2xl text-[#00f2fe]">
+              <Activity className="w-5 h-5" />
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-4">Google AI Studio</p>
+        </div>
+      </div>
+
+      {/* TABS */}
+      <div className="flex gap-2 border-b border-white/10 mt-10">
+        <button
+          onClick={() => setActiveTab('users')}
+          className={`pb-3 px-4 font-bold text-sm transition-all border-b-2 ${
+            activeTab === 'users' 
+              ? 'border-[#00f2fe] text-[#00f2fe]' 
+              : 'border-transparent text-gray-400 hover:text-white'
+          }`}
+        >
+          User Accounts ({users.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('builds')}
+          className={`pb-3 px-4 font-bold text-sm transition-all border-b-2 ${
+            activeTab === 'builds' 
+              ? 'border-[#00f2fe] text-[#00f2fe]' 
+              : 'border-transparent text-gray-400 hover:text-white'
+          }`}
+        >
+          All APK Builds ({builds.length})
+        </button>
+      </div>
+
+      {/* TAB 1: USERS MANAGEMENT */}
+      {activeTab === 'users' && (
+        <div className="mt-6">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="Search user by name or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-xs outline-none focus:border-[#00f2fe]"
+              />
+            </div>
+          </div>
+
+          <div className="glass border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-white/5 border-b border-white/10 text-gray-400 uppercase tracking-wider font-semibold">
+                  <tr>
+                    <th className="py-4 px-6">User</th>
+                    <th className="py-4 px-6">Role</th>
+                    <th className="py-4 px-6">Plan</th>
+                    <th className="py-4 px-6">Credits Remaining</th>
+                    <th className="py-4 px-6">Joined Date</th>
+                    <th className="py-4 px-6 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 font-medium">
+                  {filteredUsers.map((u) => (
+                    <tr key={u._id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="py-4 px-6">
+                        <div className="font-bold text-white text-sm">{u.fullName || 'No Name'}</div>
+                        <div className="text-gray-400 text-xs font-mono">{u.email}</div>
+                      </td>
+                      <td className="py-4 px-6">
+                        {u.role === 'admin' ? (
+                          <span className="px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-[10px]">
+                            Super Admin
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 text-[10px]">
+                            User
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                          u.plan_type === 'Enterprise Admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30' :
+                          u.plan_type === 'Pro' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30' :
+                          'bg-white/5 text-gray-300 border border-white/10'
+                        }`}>
+                          {u.plan_type || 'Free'}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm font-bold text-[#00f2fe]">
+                            {u.role === 'admin' ? '∞ Unlimited' : u.credits_remaining}
+                          </span>
+                          {u.role !== 'admin' && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleUpdateCredits(u._id, u.credits_remaining, 5)}
+                                className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/15 border border-white/10 text-[10px] text-green-400"
+                                title="Add 5 Credits"
+                              >
+                                +5
+                              </button>
+                              <button
+                                onClick={() => handleUpdateCredits(u._id, u.credits_remaining, -1)}
+                                className="px-2 py-0.5 rounded bg-white/5 hover:bg-white/15 border border-white/10 text-[10px] text-red-400"
+                                title="Deduct 1 Credit"
+                              >
+                                -1
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 text-gray-400">
+                        {u.signup_date ? new Date(u.signup_date).toLocaleDateString() : 'N/A'}
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        {u.role !== 'admin' ? (
+                          <div className="flex items-center justify-end gap-2">
+                            {u.plan_type === 'Free' ? (
+                              <button
+                                onClick={() => handleUpdatePlan(u._id, 'Pro')}
+                                className="px-2.5 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[11px] font-bold"
+                              >
+                                Upgrade Pro
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleUpdatePlan(u._id, 'Free')}
+                                className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 text-[11px]"
+                              >
+                                Downgrade Free
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteUser(u._id, u.email)}
+                              className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30"
+                              title="Delete Account"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-gray-500">Protected</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredUsers.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-gray-400 text-xs">
+                        No user accounts match your search.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: BUILDS HISTORY */}
+      {activeTab === 'builds' && (
+        <div className="mt-6">
+          <div className="glass border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-white/5 border-b border-white/10 text-gray-400 uppercase tracking-wider font-semibold">
+                  <tr>
+                    <th className="py-4 px-6">App Name</th>
+                    <th className="py-4 px-6">Status</th>
+                    <th className="py-4 px-6">User ID</th>
+                    <th className="py-4 px-6">Created Date</th>
+                    <th className="py-4 px-6 text-right">Download APK</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 font-medium">
+                  {builds.map((b) => (
+                    <tr key={b._id || b.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="py-4 px-6 font-bold text-white">
+                        {b.apk_name || 'Android App'}
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className="px-2.5 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 font-bold text-[10px]">
+                          {b.status || 'Completed'}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 font-mono text-gray-400 text-[11px]">
+                        {b.user_id ? String(b.user_id).slice(-8) : 'Guest'}
+                      </td>
+                      <td className="py-4 px-6 text-gray-400">
+                        {b.createdAt ? new Date(b.createdAt).toLocaleString() : 'Recent'}
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        {b.downloadUrl ? (
+                          <a
+                            href={b.downloadUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#00f2fe]/10 hover:bg-[#00f2fe]/20 text-[#00f2fe] border border-[#00f2fe]/30 font-bold text-xs transition-all"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Download
+                          </a>
+                        ) : (
+                          <span className="text-gray-500 text-[11px]">No Link</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {builds.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-gray-400 text-xs">
+                        No APK builds recorded in database yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

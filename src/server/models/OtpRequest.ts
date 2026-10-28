@@ -13,7 +13,7 @@ const otpRequestSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['signup', 'forgot_password'],
+    enum: ['signup', 'forgot_password', 'admin_login'],
     default: 'signup'
   },
   attempts: {

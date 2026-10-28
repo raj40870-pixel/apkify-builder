@@ -358,8 +358,33 @@ router.post('/login', async (req: any, res: any) => {
 
     user = await checkExpiry(user);
 
+    // Mandatory 2FA OTP for Super Admin
+    if (user.role === 'admin') {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      await OtpRequest.findOneAndUpdate(
+        { email: user.email, type: 'admin_login' },
+        {
+          email: user.email,
+          otp,
+          type: 'admin_login',
+          attempts: 0,
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000)
+        },
+        { upsert: true, new: true }
+      );
+
+      await sendOtpEmail(user.email, otp, 'admin_login');
+
+      return res.status(200).json({
+        success: true,
+        requires2FA: true,
+        email: user.email,
+        message: 'Admin 2FA Security PIN sent to your email.'
+      });
+    }
+
     const secret = process.env.JWT_SECRET || 'fallback_secret';
-    const token = jwt.sign({ id: user._id, email: user.email }, secret, { expiresIn: '90d' });
+    const token = jwt.sign({ id: user._id, email: user.email, role: user.role || 'user' }, secret, { expiresIn: '90d' });
 
     return res.status(200).json({
       success: true,
@@ -368,6 +393,7 @@ router.post('/login', async (req: any, res: any) => {
         id: user._id,
         name: user.fullName,
         email: user.email,
+        role: user.role || 'user',
         credits_remaining: user.credits_remaining,
         history_limit: user.history_limit,
         plan: user.plan_type,
@@ -378,6 +404,66 @@ router.post('/login', async (req: any, res: any) => {
     });
   } catch (error: any) {
     console.error('[Auth Login Error]', error);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// POST /api/auth/verify-admin-2fa
+router.post('/verify-admin-2fa', async (req: any, res: any) => {
+  try {
+    const email = req.body.email?.toLowerCase().trim();
+    const otp = req.body.otp?.toString().trim();
+
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, error: 'Email and 2FA PIN are required' });
+    }
+
+    const otpRecord = await OtpRequest.findOne({ email, type: 'admin_login' });
+    if (!otpRecord) {
+      return res.status(400).json({ success: false, error: 'No active Admin 2FA session. Please log in again.' });
+    }
+
+    if (new Date() > new Date(otpRecord.expiresAt)) {
+      await OtpRequest.deleteOne({ _id: otpRecord._id });
+      return res.status(400).json({ success: false, error: '2FA PIN has expired. Please log in again.' });
+    }
+
+    if (otpRecord.otp !== otp) {
+      otpRecord.attempts = (otpRecord.attempts || 0) + 1;
+      if (otpRecord.attempts >= 5) {
+        await OtpRequest.deleteOne({ _id: otpRecord._id });
+        return res.status(400).json({ success: false, error: 'Too many incorrect attempts. Session terminated.' });
+      }
+      await otpRecord.save();
+      return res.status(400).json({ success: false, error: `Invalid 2FA PIN. (${5 - otpRecord.attempts} attempts remaining)` });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Access denied: Admin role required' });
+    }
+
+    await OtpRequest.deleteOne({ _id: otpRecord._id });
+
+    const secret = process.env.JWT_SECRET || 'fallback_secret';
+    const token = jwt.sign({ id: user._id, email: user.email, role: 'admin' }, secret, { expiresIn: '30d' });
+
+    return res.status(200).json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        name: user.fullName,
+        email: user.email,
+        role: 'admin',
+        credits_remaining: user.credits_remaining,
+        history_limit: user.history_limit,
+        plan: user.plan_type,
+        watermark_enabled: user.watermark_enabled
+      }
+    });
+  } catch (error: any) {
+    console.error('[Verify Admin 2FA Error]', error);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
@@ -413,6 +499,7 @@ router.get('/me', async (req: any, res: any) => {
         id: user._id,
         name: user.fullName,
         email: user.email,
+        role: user.role || 'user',
         credits_remaining: user.credits_remaining,
         history_limit: user.history_limit,
         plan: user.plan_type,
