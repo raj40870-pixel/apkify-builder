@@ -82,6 +82,26 @@ export default function LandingPage() {
               <span className="flex items-center gap-1"><Code2 className="w-3 h-3 md:w-4 md:h-4" /> HTML</span>
             </div>
           </motion.div>
+
+          {/* Hero Showcase Preview Image */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+            className="mt-12 md:mt-16 max-w-5xl mx-auto px-2 sm:px-4"
+          >
+            <div className="relative rounded-3xl p-1.5 sm:p-2 bg-gradient-to-b from-blue-500/30 via-purple-500/20 to-blue-500/10 shadow-[0_0_80px_-20px_rgba(59,130,246,0.35)]">
+              <div className="relative rounded-[20px] overflow-hidden bg-black/60 border border-white/10 group">
+                <img 
+                  src="/hero-showcase.jpg" 
+                  alt="APKify Builder - Web to APK Converter" 
+                  className="w-full h-auto object-cover rounded-[20px] shadow-2xl transition-transform duration-700 group-hover:scale-[1.01]"
+                  loading="eager"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+              </div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
