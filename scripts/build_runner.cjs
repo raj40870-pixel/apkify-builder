@@ -8,6 +8,7 @@ async function main() {
   const package_id = process.env.PACKAGE_ID || 'com.apkify.app';
   let target_url = (process.env.TARGET_URL || '').trim();
   const html_code = process.env.HTML_CODE || '';
+  const zip_url = (process.env.ZIP_URL || '').trim();
   const is_premium = process.env.IS_PREMIUM === 'true';
 
   console.log('====================================================');
@@ -15,11 +16,18 @@ async function main() {
   console.log(`App Name: ${app_name}`);
   console.log(`Package ID: ${package_id}`);
   console.log(`Target URL: ${target_url}`);
+  console.log(`ZIP URL: ${zip_url}`);
   console.log(`Is Premium: ${is_premium}`);
   console.log('====================================================');
 
-  // Normalize URL to always include protocol
-  if (target_url && !target_url.startsWith('http://') && !target_url.startsWith('https://')) {
+  // Determine build mode
+  const isZipMode = zip_url && zip_url.length > 0;
+  const isHtmlMode = html_code && html_code.trim().length > 0;
+  const isLocalMode = isZipMode || isHtmlMode;
+  const isUrlMode = target_url && target_url.trim().length > 0 && !isLocalMode;
+
+  // Normalize URL only in URL mode
+  if (isUrlMode && !target_url.startsWith('http://') && !target_url.startsWith('https://')) {
     target_url = `https://${target_url}`;
   }
 
@@ -46,10 +54,7 @@ async function main() {
   };
   fs.writeFileSync(path.join(tempDir, 'package.json'), JSON.stringify(pkg, null, 2));
 
-  // 2. Prepare capacitor.config.json
-  const isLocalMode = html_code && html_code.trim().length > 0;
-  const isUrlMode = target_url && target_url.trim().length > 0 && !isLocalMode;
-
+  // 2. Prepare capacitor.config.json (NEVER set server URL in local/zip/html mode!)
   const capConfig = {
     appId: package_id,
     appName: app_name,
@@ -67,26 +72,95 @@ async function main() {
 
   fs.writeFileSync(path.join(tempDir, 'capacitor.config.json'), JSON.stringify(capConfig, null, 2));
 
-  // 3. Create dummy www directory
+  // 3. Create www directory and extract / write assets
   const wwwDir = path.join(tempDir, 'www');
   fs.mkdirSync(wwwDir, { recursive: true });
-  const indexHtmlContent = `<!DOCTYPE html>
+
+  if (isZipMode) {
+    console.log(`[Step 0/5] Downloading ZIP from ${zip_url}...`);
+    const zipPath = path.join(tempDir, 'source.zip');
+    try {
+      if (zip_url.startsWith('http://') || zip_url.startsWith('https://')) {
+        execSync(`curl -L -s -f -o "${zipPath}" "${zip_url}"`, { stdio: 'inherit' });
+      } else if (fs.existsSync(zip_url)) {
+        fs.copyFileSync(zip_url, zipPath);
+      }
+
+      if (fs.existsSync(zipPath)) {
+        execSync(`unzip -q -o "${zipPath}" -d "${wwwDir}"`, { stdio: 'inherit' });
+        fs.unlinkSync(zipPath);
+
+        // Hoist nested folder if the zip was wrapped in a single root directory
+        let items = fs.readdirSync(wwwDir).filter(f => f !== '__MACOSX' && !f.startsWith('.'));
+        if (items.length === 1 && fs.statSync(path.join(wwwDir, items[0])).isDirectory()) {
+          const subDir = path.join(wwwDir, items[0]);
+          const subFiles = fs.readdirSync(subDir);
+          for (const sf of subFiles) {
+            fs.renameSync(path.join(subDir, sf), path.join(wwwDir, sf));
+          }
+          fs.rmSync(subDir, { recursive: true, force: true });
+        }
+
+        // Recursive index.html finder - if named game.html or inside subfolder
+        if (!fs.existsSync(path.join(wwwDir, 'index.html'))) {
+          function findHtml(dir) {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const e of entries) {
+              if (e.name === '__MACOSX' || e.name.startsWith('.')) continue;
+              if (e.isFile() && e.name.toLowerCase().endsWith('.html')) return path.join(dir, e.name);
+              if (e.isDirectory()) {
+                const res = findHtml(path.join(dir, e.name));
+                if (res) return res;
+              }
+            }
+            return null;
+          }
+          const found = findHtml(wwwDir);
+          if (found) {
+            const pDir = path.dirname(found);
+            if (pDir !== wwwDir) {
+              const pFiles = fs.readdirSync(pDir);
+              for (const pf of pFiles) {
+                const d = path.join(wwwDir, pf);
+                if (!fs.existsSync(d)) fs.renameSync(path.join(pDir, pf), d);
+              }
+            }
+            if (!fs.existsSync(path.join(wwwDir, 'index.html'))) {
+              fs.renameSync(found, path.join(wwwDir, 'index.html'));
+            }
+          } else {
+            fs.writeFileSync(path.join(wwwDir, 'index.html'), `<!DOCTYPE html><html><body><h1>${app_name}</h1></body></html>`);
+          }
+        }
+        console.log('[Step 0/5] ZIP extracted successfully into www/ directory.');
+      }
+    } catch (err) {
+      console.error('Failed to download or extract ZIP package:', err);
+      fs.writeFileSync(path.join(wwwDir, 'index.html'), `<!DOCTYPE html><html><body><h1>${app_name}</h1></body></html>`);
+    }
+  } else if (isHtmlMode) {
+    fs.writeFileSync(path.join(wwwDir, 'index.html'), html_code);
+  } else if (isUrlMode) {
+    const indexHtmlContent = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${app_name}</title>
-  ${isUrlMode ? `<script>
+  <script>
     if (window.location.protocol === 'file:' || window.location.hostname === 'localhost') {
       window.location.replace("${target_url}");
     }
-  </script>` : ''}
+  </script>
 </head>
 <body style="margin:0;padding:0;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#ffffff;">
-  ${isLocalMode ? html_code : `<div id="app">Loading ${app_name}...</div>`}
+  <div id="app">Loading ${app_name}...</div>
 </body>
 </html>`;
-  fs.writeFileSync(path.join(wwwDir, 'index.html'), indexHtmlContent);
+    fs.writeFileSync(path.join(wwwDir, 'index.html'), indexHtmlContent);
+  } else {
+    fs.writeFileSync(path.join(wwwDir, 'index.html'), `<!DOCTYPE html><html><body><h1>${app_name}</h1></body></html>`);
+  }
 
   // 4. Install npm dependencies
   console.log('[Step 1/5] Installing Capacitor dependencies...');

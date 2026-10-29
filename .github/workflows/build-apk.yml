@@ -10,17 +10,21 @@ on:
       app_name:
         description: 'App Name'
         required: true
-        default: 'CompilarApp'
+        default: 'ApkifyApp'
       package_id:
         description: 'Android Package ID'
         required: true
-        default: 'com.compilar.app'
+        default: 'com.apkify.app'
       target_url:
         description: 'Target Website URL'
         required: false
-        default: 'https://compilar.vercel.app'
+        default: ''
       html_code:
         description: 'Raw HTML Code'
+        required: false
+        default: ''
+      zip_url:
+        description: 'Uploaded ZIP file URL or path'
         required: false
         default: ''
       is_premium:
@@ -66,6 +70,7 @@ jobs:
           PACKAGE_ID: ${{ github.event.inputs.package_id }}
           TARGET_URL: ${{ github.event.inputs.target_url }}
           HTML_CODE: ${{ github.event.inputs.html_code }}
+          ZIP_URL: ${{ github.event.inputs.zip_url }}
           IS_PREMIUM: ${{ github.event.inputs.is_premium }}
         run: |
           node scripts/build_runner.cjs

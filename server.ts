@@ -20,6 +20,7 @@ import adminRoutes from './src/server/routes/admin.js';
 import jwt from 'jsonwebtoken';
 import User from './src/server/models/User.js';
 import Build from './src/server/models/Build.js';
+import AdmZip from 'adm-zip';
 dotenv.config({ path: '.env.local' });
 
 // Connect MongoDB on startup with retry logic
@@ -258,6 +259,7 @@ async function buildApkViaGitHubActions(
   packageId: string,
   sendProgress: (p: number, s: string, extra?: any) => void,
   htmlCode?: string,
+  zipData?: string,
   isPremium: boolean = false
 ) {
   const token = process.env.GITHUB_TOKEN;
@@ -268,7 +270,68 @@ async function buildApkViaGitHubActions(
     throw new Error('GITHUB_TOKEN environment variable is not configured on server.');
   }
 
-  sendProgress(10, 'Triggering GitHub Actions 16GB Cloud Runner...');
+  sendProgress(10, 'Processing project inputs...');
+
+  let effectiveHtmlCode = htmlCode || '';
+  let zipUrl = '';
+
+  if (zipData && zipData.trim()) {
+    try {
+      const matches = zipData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      const b64 = matches ? matches[2] : zipData;
+      const zipBuffer = Buffer.from(b64, 'base64');
+
+      // 1. Save locally in apks/ so it can be served
+      const apksDir = path.join(process.cwd(), 'apks');
+      await fs.mkdir(apksDir, { recursive: true }).catch(() => {});
+      const localZipPath = path.join(apksDir, `${jobId}_source.zip`);
+      await fs.writeFile(localZipPath, zipBuffer);
+
+      // 2. Extract with AdmZip to check if there is an HTML file (like game.html / index.html)
+      const zip = new AdmZip(zipBuffer);
+      const zipEntries = zip.getEntries();
+      
+      const htmlEntry = zipEntries.find(e => !e.isDirectory && e.entryName.toLowerCase().endsWith('.html'));
+      if (htmlEntry) {
+        const textContent = htmlEntry.getData().toString('utf8');
+        if (textContent.length < 60000 && zipEntries.length <= 3) {
+          effectiveHtmlCode = textContent;
+        }
+      }
+
+      // 3. Upload to GitHub as a temporary build asset in repo so runner can access it directly
+      sendProgress(15, 'Uploading project package to build runner...');
+      const uploadPath = `uploads/${jobId}.zip`;
+      const uploadApiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${uploadPath}`;
+      
+      const uploadRes = await fetch(uploadApiUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'APKify-Builder'
+        },
+        body: JSON.stringify({
+          message: `chore: upload source zip for ${jobId}`,
+          content: zipBuffer.toString('base64'),
+          branch: 'main'
+        })
+      });
+
+      if (uploadRes.ok) {
+        zipUrl = `uploads/${jobId}.zip`;
+        console.log(`[GitHub Actions] Successfully uploaded ${uploadPath} for build ${jobId}`);
+      } else {
+        const publicHost = process.env.PUBLIC_BACKEND_URL || process.env.API_BASE_URL || 'https://apkify-builder.ai.studio';
+        zipUrl = `${publicHost}/apks/${jobId}_source.zip`;
+      }
+    } catch (zipErr: any) {
+      console.error('[API] Error processing zipData for GitHub Actions:', zipErr);
+    }
+  }
+
+  sendProgress(20, 'Triggering GitHub Actions 16GB Cloud Runner...');
 
   const dispatchUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/build-apk.yml/dispatches`;
   const dispatchRes = await fetch(dispatchUrl, {
@@ -285,8 +348,9 @@ async function buildApkViaGitHubActions(
         job_id: jobId,
         app_name: appName,
         package_id: packageId,
-        target_url: url,
-        html_code: htmlCode || '',
+        target_url: url || '',
+        html_code: effectiveHtmlCode || '',
+        zip_url: zipUrl || '',
         is_premium: isPremium ? 'true' : 'false'
       }
     })
@@ -553,12 +617,12 @@ async function buildApkLocally(
       const wwwDir = path.join(tempDir, 'www');
       await fs.mkdir(wwwDir, { recursive: true });
 
-      const psCmd = `Expand-Archive -Path '${zipPath}' -DestinationPath '${wwwDir}' -Force`;
-      const zipExtracted = await runCommand('powershell.exe', ['-Command', psCmd], tempDir, (log) => {
-        console.log(`[ZIP Extract] ${log.trim()}`);
-      });
-      if (!zipExtracted) {
-        throw new Error("Failed to extract uploaded ZIP file.");
+      try {
+        const zip = new AdmZip(zipBuffer);
+        zip.extractAllTo(wwwDir, true);
+        console.log('[ZIP Extract] Extracted successfully using AdmZip');
+      } catch (e: any) {
+        throw new Error(`Failed to extract uploaded ZIP file: ${e.message}`);
       }
       await fs.unlink(zipPath).catch(() => {});
 
@@ -1144,7 +1208,7 @@ app.post('/api/build-apk', async (req, res) => {
     const isPremiumDB = (user && user.role === 'admin') ? true : (user ? !user.watermark_enabled : false);
     
     const buildRunner = process.env.GITHUB_TOKEN
-      ? buildApkViaGitHubActions(jobId, url || '', appName, packageId, sendProgress, htmlCode, isPremiumDB)
+      ? buildApkViaGitHubActions(jobId, url || '', appName, packageId, sendProgress, htmlCode, zipData, isPremiumDB)
       : buildApkLocally(jobId, url || '', appName, packageId, iconUrl, sendProgress, htmlCode, zipData, isPremiumDB);
 
     buildRunner
