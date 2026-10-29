@@ -44,13 +44,13 @@ export default function TermsPage() {
         <section>
           <div className="flex items-center gap-3 mb-4">
             <FileText className="w-6 h-6 text-purple-500" />
-            <h2 className="text-2xl font-bold m-0">2. Free Credit System & 15-Day Auto Refill</h2>
+            <h2 className="text-2xl font-bold m-0">2. Free Credit System & 14-Day Auto Refill</h2>
           </div>
           <p className="text-white/80 leading-relaxed">
             Upon successful registration and OTP confirmation, Free Tier users receive 3 APK build credits:
           </p>
           <ul className="text-white/80 space-y-2 mt-4 ml-6 list-disc">
-            <li><strong>Automated 15-Day Refill:</strong> Free credits automatically refill back to 3 credits every 15 days from your last refill date. No manual ticket or admin intervention is required.</li>
+            <li><strong>Automated 14-Day Refill:</strong> Free credits automatically refill back to 3 credits every 14 days from your last refill date. No manual ticket or admin intervention is required.</li>
             <li><strong>Non-Cumulative Quota:</strong> Unused credits do not roll over across refill cycles. The balance resets to a cap of 3.</li>
             <li><strong>Immediate Deduction:</strong> Credits are deducted when a build job is dispatched. If a build crashes due to system error, credits are automatically refunded to your balance.</li>
             <li><strong>Watermark Notice:</strong> All APKs generated on the Free Plan contain an unobtrusive APKify Builder launch badge to promote platform transparency.</li>

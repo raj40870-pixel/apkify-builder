@@ -36,7 +36,7 @@ export default function Footer() {
         <div className="mt-8 pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between text-xs text-white/30 gap-4">
           <div className="flex items-center gap-2 text-[11px]">
             <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-            <span>24/7 Automated Infrastructure &bull; 15-Day Auto Refill &bull; Active Anti-Abuse Shield</span>
+            <span>24/7 Automated Infrastructure &bull; 14-Day Auto Refill &bull; Active Anti-Abuse Shield</span>
           </div>
           <div>
             &copy; {new Date().getFullYear()} APKify Builder. All rights reserved.
