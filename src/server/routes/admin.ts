@@ -4,6 +4,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import User from '../models/User.js';
 import Build from '../models/Build.js';
+import Ticket from '../models/Ticket.js';
+import { sendTicketReplyEmail } from '../utils/mailer.js';
 
 const router = express.Router();
 
@@ -44,6 +46,8 @@ router.get('/stats', requireAdmin, async (req: any, res: any) => {
     const totalUsers = await User.countDocuments();
     const totalBuilds = await Build.countDocuments();
     const proUsers = await User.countDocuments({ plan_type: { $ne: 'Free' } });
+    const totalTickets = await Ticket.countDocuments();
+    const openTickets = await Ticket.countDocuments({ status: { $in: ['Open', 'In Progress'] } });
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -56,8 +60,10 @@ router.get('/stats', requireAdmin, async (req: any, res: any) => {
         totalBuilds,
         proUsers,
         buildsToday,
+        totalTickets,
+        openTickets,
         systemStatus: 'Online',
-        backend: 'Google AI Studio',
+        backend: 'Cloud API Engine',
         builder: 'GitHub Actions 16GB Runner'
       }
     });
@@ -286,6 +292,112 @@ router.post('/builds/clear-all', requireAdmin, async (req: any, res: any) => {
       message: `Database Cleared: ${result.deletedCount} builds deleted`,
       deletedCount: result.deletedCount
     });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// SUPPORT TICKETS & CATEGORY ISSUES (ADMIN)
+// ==========================================
+
+// 10. GET /api/admin/tickets - Fetch all user submitted tickets
+router.get('/tickets', requireAdmin, async (req: any, res: any) => {
+  try {
+    const { status, category, search } = req.query;
+    let query: any = {};
+
+    if (status && status !== 'All') {
+      query.status = status;
+    }
+    if (category && category !== 'All') {
+      query.category = category;
+    }
+    if (search) {
+      const searchRegex = new RegExp(String(search), 'i');
+      query.$or = [
+        { user_email: searchRegex },
+        { user_name: searchRegex },
+        { subject: searchRegex },
+        { description: searchRegex }
+      ];
+    }
+
+    const tickets = await Ticket.find(query).sort({ created_at: -1 });
+    return res.status(200).json({ success: true, tickets });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 11. PUT /api/admin/tickets/:id/reply - Admin replies to user's issue & updates status
+router.put('/tickets/:id/reply', requireAdmin, async (req: any, res: any) => {
+  try {
+    const { reply, status } = req.body;
+    if (!reply || !reply.trim()) {
+      return res.status(400).json({ success: false, error: 'Reply text cannot be empty' });
+    }
+
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ success: false, error: 'Support ticket not found' });
+    }
+
+    ticket.admin_reply = reply.trim();
+    ticket.admin_replied_at = new Date();
+    ticket.admin_name = req.admin?.fullName || 'Kamaljit (Lead Developer)';
+    if (status) {
+      ticket.status = status;
+    } else {
+      ticket.status = 'Resolved';
+    }
+    await ticket.save();
+
+    // Send email notification to user asynchronously (non-blocking)
+    sendTicketReplyEmail(ticket.user_email, ticket.subject, reply.trim(), ticket.status).catch((emailErr) => {
+      console.warn('[Admin Reply Email Error]:', emailErr.message);
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Reply sent to user successfully!',
+      ticket
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 12. PUT /api/admin/tickets/:id/status - Update ticket status
+router.put('/tickets/:id/status', requireAdmin, async (req: any, res: any) => {
+  try {
+    const { status } = req.body;
+    if (!['Open', 'In Progress', 'Resolved'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid status value' });
+    }
+
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ success: false, error: 'Support ticket not found' });
+    }
+
+    ticket.status = status;
+    await ticket.save();
+
+    return res.status(200).json({ success: true, message: `Status updated to ${status}`, ticket });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 13. DELETE /api/admin/tickets/:id - Delete ticket
+router.delete('/tickets/:id', requireAdmin, async (req: any, res: any) => {
+  try {
+    const ticket = await Ticket.findByIdAndDelete(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ success: false, error: 'Ticket not found' });
+    }
+    return res.status(200).json({ success: true, message: 'Ticket deleted successfully' });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

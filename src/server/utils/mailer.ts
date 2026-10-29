@@ -93,3 +93,56 @@ export async function sendOtpEmail(email: string, otp: string, type: 'signup' | 
   console.log(`[NODEMAILER] Email sent successfully to ${email}. MessageId: ${info.messageId}`);
   return { success: true, messageId: info.messageId };
 }
+
+export async function sendTicketReplyEmail(email: string, ticketSubject: string, replyText: string, status: string) {
+  const subject = `Developer Reply: [${status}] regarding "${ticketSubject}"`;
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>${subject}</title>
+      <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0b0f19; color: #f8fafc; }
+        .container { max-width: 540px; margin: 30px auto; background: #151a28; border: 1px solid #1e293b; border-radius: 16px; padding: 32px 28px; }
+        .badge { display: inline-block; background: #10b98120; color: #34d399; font-weight: 700; font-size: 13px; padding: 4px 12px; border-radius: 9999px; margin-bottom: 20px; border: 1px solid #10b98140; }
+        h1 { font-size: 20px; font-weight: 700; color: #ffffff; margin-bottom: 12px; }
+        p { font-size: 14px; line-height: 1.6; color: #94a3b8; }
+        .reply-box { background: #0f1422; border-left: 4px solid #38bdf8; border-radius: 8px; padding: 18px; margin: 20px 0; color: #f1f5f9; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+        .footer { border-top: 1px solid #1e293b; padding-top: 16px; margin-top: 24px; font-size: 12px; color: #64748b; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="badge">Status: ${status}</div>
+        <h1>Support Issue Update</h1>
+        <p>Our developer has responded to your issue: <strong>"${ticketSubject}"</strong></p>
+        <div class="reply-box">${replyText}</div>
+        <p>You can check the full ticket status anytime directly in your APKify Builder dashboard.</p>
+        <div class="footer">
+          &copy; ${new Date().getFullYear()} APKify Builder Support & Engineering Team
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const transporter = getTransporter();
+  if (!transporter) {
+    console.log(`[Support Mailer] Simulated reply email to ${email}`);
+    return { success: true, simulated: true };
+  }
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"APKify Builder Support" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: subject,
+      html: htmlContent
+    });
+    return { success: true, messageId: info.messageId };
+  } catch (err: any) {
+    console.warn(`[Support Mailer Warning] Failed to send email to ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}

@@ -12,6 +12,7 @@ import PaymentPage from './pages/PaymentPage';
 import TermsPage from './pages/TermsPage';
 import AboutPage from './pages/AboutPage';
 import AdminPage from './pages/AdminPage';
+import SupportPage from './pages/SupportPage';
 import { User, Build } from './types';
 
 // Protected Route Component
@@ -129,6 +130,7 @@ export default function App() {
             />
             <Route path="/terms-and-condition" element={<TermsPage />} />
             <Route path="/about" element={<AboutPage />} />
+            <Route path="/support" element={<SupportPage />} />
             {/* Fallback to landing */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Cpu, LogIn, UserCircle, LogOut, ChevronDown, Wrench, ShieldCheck } from 'lucide-react';
+import { Cpu, LogIn, UserCircle, LogOut, ChevronDown, Wrench, ShieldCheck, HelpCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -90,6 +90,14 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
                     >
                       <Wrench className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
                       Build
+                    </Link>
+                    <Link 
+                      to="/support" 
+                      onClick={() => setShowDropdown(false)}
+                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-sm transition-colors group"
+                    >
+                      <HelpCircle className="w-4 h-4 text-[#00f2fe] group-hover:scale-110 transition-transform" />
+                      Help & Support
                     </Link>
                     
                     <button 

@@ -17,6 +17,7 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import authRoutes from './src/server/routes/auth.js';
 import adminRoutes from './src/server/routes/admin.js';
+import supportRoutes from './src/server/routes/support.js';
 import jwt from 'jsonwebtoken';
 import User from './src/server/models/User.js';
 import Build from './src/server/models/Build.js';
@@ -65,9 +66,10 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/apks', express.static(path.join(process.cwd(), 'apks')));
 
-// Mount Auth Routes
+// Mount Auth & Admin & Support Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/support', supportRoutes);
 // Request logging
 app.use((req, res, next) => {
   console.log(`[API] ${req.method} ${req.url}`);
