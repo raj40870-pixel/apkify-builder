@@ -579,12 +579,53 @@ async function buildApkLocally(
 
       // Robust ZIP Handling: Ensure index.html exists in www/
       if (!existsSync(path.join(wwwDir, 'index.html'))) {
-        const allFiles = await fs.readdir(wwwDir);
-        const htmlFile = allFiles.find(f => f.toLowerCase().endsWith('.html'));
-        if (htmlFile) {
-          await fs.rename(path.join(wwwDir, htmlFile), path.join(wwwDir, 'index.html'));
+        const findHtmlRecursive = async (dir: string): Promise<string | null> => {
+          try {
+            const entries = await fs.readdir(dir, { withFileTypes: true });
+            // First check if index.html exists anywhere
+            for (const entry of entries) {
+              if (entry.name === '__MACOSX' || entry.name.startsWith('.')) continue;
+              if (entry.isFile() && entry.name.toLowerCase() === 'index.html') {
+                return path.join(dir, entry.name);
+              }
+            }
+            // Next check any .html file
+            for (const entry of entries) {
+              if (entry.name === '__MACOSX' || entry.name.startsWith('.')) continue;
+              const fullPath = path.join(dir, entry.name);
+              if (entry.isFile() && entry.name.toLowerCase().endsWith('.html')) {
+                return fullPath;
+              }
+              if (entry.isDirectory()) {
+                const res = await findHtmlRecursive(fullPath);
+                if (res) return res;
+              }
+            }
+          } catch (e) {}
+          return null;
+        };
+
+        const foundHtml = await findHtmlRecursive(wwwDir);
+        if (foundHtml) {
+          const parentDir = path.dirname(foundHtml);
+          if (parentDir !== wwwDir) {
+            // Hoist files from parentDir to wwwDir so relative paths (css/, js/, assets/) continue working
+            try {
+              const parentFiles = await fs.readdir(parentDir);
+              for (const pf of parentFiles) {
+                const src = path.join(parentDir, pf);
+                const dest = path.join(wwwDir, pf);
+                if (!existsSync(dest)) {
+                  await fs.rename(src, dest).catch(() => {});
+                }
+              }
+            } catch (e) {}
+          }
+          if (!existsSync(path.join(wwwDir, 'index.html'))) {
+            await fs.rename(foundHtml, path.join(wwwDir, 'index.html')).catch(() => {});
+          }
         } else {
-          await fs.writeFile(path.join(wwwDir, 'index.html'), '<html><body><h1>App Preview</h1></body></html>');
+          await fs.writeFile(path.join(wwwDir, 'index.html'), '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>App</title></head><body style="background:#0a0a0c;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;"><h1>App Ready</h1></body></html>');
         }
       }
     }
@@ -1042,13 +1083,13 @@ app.post('/api/build-apk', async (req, res) => {
       // Automated Risk & Abuse Flag Detection
       const riskFlags: string[] = [];
       const suspiciousTerms = ['phish', 'login-fake', 'hack', 'free-crypto', 'free-recharge', 'scam', 'betting', 'casino'];
-      const targetUrl = (webUrl || '').toLowerCase();
+      const targetUrl = (url || '').toLowerCase();
       if (suspiciousTerms.some(term => targetUrl.includes(term))) {
-        riskFlags.push(`⚠️ Suspicious URL: ${webUrl.substring(0, 30)}...`);
+        riskFlags.push(`⚠️ Suspicious URL: ${(url || '').substring(0, 30)}...`);
       }
-      const pkg = (packageName || '').toLowerCase();
+      const pkg = (packageId || '').toLowerCase();
       if (pkg.startsWith('com.google.') || pkg.startsWith('com.whatsapp.') || pkg.startsWith('com.sbi.') || pkg.startsWith('com.paytm.')) {
-        riskFlags.push(`⚠️ Spoofing Package: ${packageName}`);
+        riskFlags.push(`⚠️ Spoofing Package: ${packageId}`);
       }
 
       if (riskFlags.length > 0) {
