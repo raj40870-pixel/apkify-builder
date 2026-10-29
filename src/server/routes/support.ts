@@ -25,17 +25,26 @@ const extractUser = async (req: any) => {
   }
 };
 
+const CATEGORY_MAP: Record<string, string> = {
+  'build_issue': 'APK Build Issue / Stuck',
+  'download_expired': 'Download Link Expired / Broken',
+  'billing_credits': 'Credits & 14-Day Auto-Refill',
+  'account_auth': 'Account, Login & 2FA',
+  'feature_request': 'Feature Request & Ideas',
+  'other_problem': 'General Problem Solving'
+};
+
 // 1. GET /api/support/categories - List available issue categories
 router.get('/categories', (req, res) => {
   res.json({
     success: true,
     categories: [
-      { id: 'build_issue', label: 'APK Build Issue / Stuck', icon: 'Wrench', description: 'Gradle compile error, build failed or infinite loading' },
-      { id: 'download_expired', label: 'Download Link Expired / Broken', icon: 'Download', description: 'Unable to download APK, 404 error or corrupted package' },
-      { id: 'billing_credits', label: 'Credits & 14-Day Auto-Refill', icon: 'CreditCard', description: 'Credit balance issues, plan refill or payment inquiries' },
-      { id: 'account_auth', label: 'Account, Login & 2FA', icon: 'UserCheck', description: 'Password reset, email OTP, 2FA or suspension appeals' },
-      { id: 'feature_request', label: 'Feature Request & Ideas', icon: 'Sparkles', description: 'Suggest new features, SDK upgrades or UI improvements' },
-      { id: 'other_problem', label: 'General Problem Solving', icon: 'HelpCircle', description: 'Any other issue, bug report or technical question' }
+      { id: 'APK Build Issue / Stuck', label: 'APK Build Issue / Stuck', icon: 'Wrench', description: 'Gradle compile error, build failed or infinite loading' },
+      { id: 'Download Link Expired / Broken', label: 'Download Link Expired / Broken', icon: 'Download', description: 'Unable to download APK, 404 error or corrupted package' },
+      { id: 'Credits & 14-Day Auto-Refill', label: 'Credits & 14-Day Auto-Refill', icon: 'CreditCard', description: 'Credit balance issues, plan refill or payment inquiries' },
+      { id: 'Account, Login & 2FA', label: 'Account, Login & 2FA', icon: 'UserCheck', description: 'Password reset, email OTP, 2FA or suspension appeals' },
+      { id: 'Feature Request & Ideas', label: 'Feature Request & Ideas', icon: 'Sparkles', description: 'Suggest new features, SDK upgrades or UI improvements' },
+      { id: 'General Problem Solving', label: 'General Problem Solving', icon: 'HelpCircle', description: 'Any other issue, bug report or technical question' }
     ]
   });
 });
@@ -59,12 +68,13 @@ router.post('/tickets', async (req: any, res: any) => {
     }
 
     const ticketName = user ? (user.fullName || user.displayName || 'User') : (name || 'Guest User');
+    const normalizedCategory = CATEGORY_MAP[category] || category || 'General Problem Solving';
 
     const newTicket = new Ticket({
       user_id: user ? user._id : undefined,
       user_email: ticketEmail.toLowerCase().trim(),
       user_name: ticketName,
-      category: category || 'General Problem Solving',
+      category: normalizedCategory,
       subject: subject.trim(),
       description: description.trim(),
       status: 'Open'
@@ -91,16 +101,18 @@ router.get('/my-tickets', async (req: any, res: any) => {
 
     let filter: any = {};
     if (user) {
+      const emails = [user.email.toLowerCase().trim()];
+      if (queryEmail && !emails.includes(queryEmail)) emails.push(queryEmail);
       filter = {
         $or: [
           { user_id: user._id },
-          { user_email: user.email.toLowerCase().trim() }
+          { user_email: { $in: emails } }
         ]
       };
     } else if (queryEmail) {
       filter = { user_email: queryEmail };
     } else {
-      return res.status(401).json({ success: false, error: 'Authentication or email query required' });
+      return res.status(200).json({ success: true, tickets: [] });
     }
 
     const tickets = await Ticket.find(filter).sort({ created_at: -1 });

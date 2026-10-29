@@ -5,7 +5,6 @@
 
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { exec, spawn, execSync } from 'child_process';
@@ -14,7 +13,6 @@ import fs from 'fs/promises';
 import { existsSync, mkdirSync, realpathSync, readdirSync } from 'fs';
 import os from 'os';
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import authRoutes from './src/server/routes/auth.js';
 import adminRoutes from './src/server/routes/admin.js';
 import supportRoutes from './src/server/routes/support.js';
@@ -30,6 +28,7 @@ const connectDB = async () => {
   if (!mongoUrl) {
     console.warn('[MongoDB] ⚠️  MONGODB_URL not set in .env.local. Starting in-memory MongoDB...');
     try {
+      const { MongoMemoryServer } = await import('mongodb-memory-server');
       const mongod = await MongoMemoryServer.create();
       mongoUrl = mongod.getUri();
       console.log(`[MongoDB] 🧠 Started in-memory MongoDB at: ${mongoUrl}`);
@@ -1413,11 +1412,16 @@ async function startServer() {
   try {
     const hasFrontend = existsSync(path.join(process.cwd(), 'index.html'));
     if (hasFrontend && process.env.NODE_ENV !== 'production') {
-      const vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: 'spa',
-      });
-      app.use(vite.middlewares);
+      try {
+        const { createServer: createViteServer } = await import('vite');
+        const vite = await createViteServer({
+          server: { middlewareMode: true },
+          appType: 'spa',
+        });
+        app.use(vite.middlewares);
+      } catch (e: any) {
+        console.warn('[Vite Dev Middleware] Skipped:', e.message);
+      }
     } else if (hasFrontend && existsSync(path.join(process.cwd(), 'dist', 'index.html'))) {
       const distPath = path.join(process.cwd(), 'dist');
       app.use(express.static(distPath));
