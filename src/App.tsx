@@ -32,9 +32,9 @@ export default function App() {
   
   // Mock builds for dashboard
   const [builds] = useState<Build[]>([
-    { id: '1', appName: 'My Ecommerce', techStack: 'React Native', date: 'Oct 24, 2024', status: 'Completed', downloadUrl: '#' },
-    { id: '2', appName: 'Fitness Tracker', techStack: 'Flutter', date: 'Oct 28, 2024', status: 'Completed', downloadUrl: '#' },
-    { id: '3', appName: 'News App', techStack: 'React Native', date: 'Nov 02, 2024', status: 'Building', downloadUrl: '#' },
+    { id: '1', appName: 'My Ecommerce', techStack: 'Website URL', date: 'Oct 24, 2024', status: 'Completed', downloadUrl: '#' },
+    { id: '2', appName: 'Fitness Tracker', techStack: 'ZIP Package', date: 'Oct 28, 2024', status: 'Completed', downloadUrl: '#' },
+    { id: '3', appName: 'News App', techStack: 'Website URL', date: 'Nov 02, 2024', status: 'Building', downloadUrl: '#' },
     { id: '4', appName: 'Portfolio', techStack: 'HTML/Web', date: 'Nov 05, 2024', status: 'Completed', downloadUrl: '#' },
   ]);
 

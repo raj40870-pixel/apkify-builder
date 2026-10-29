@@ -387,7 +387,7 @@ export default function BuilderPage() {
                         <Upload className="w-10 h-10 text-blue-500" />
                       </div>
                       <h3 className="font-bold text-lg mb-1">Click to upload ZIP</h3>
-                      <p className="text-white/30 text-sm">Max 100MB • HTML or React Native</p>
+                      <p className="text-white/30 text-sm">Max 100MB • Web assets / HTML ZIP package</p>
                     </div>
                     <input type="file" ref={fileInputRef} onChange={handleZipChange} className="hidden" accept=".zip" />
                   </div>

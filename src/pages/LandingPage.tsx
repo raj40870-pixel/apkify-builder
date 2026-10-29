@@ -75,11 +75,11 @@ export default function LandingPage() {
             </Button>
             
             <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3 px-6 py-4 glass rounded-2xl text-white/40 text-xs sm:text-sm">
-              <span className="flex items-center gap-1"><Code2 className="w-3 h-3 md:w-4 md:h-4" /> React</span>
+              <span className="flex items-center gap-1"><Box className="w-3 h-3 md:w-4 md:h-4" /> ZIP</span>
               <span className="hidden sm:inline w-1 h-1 rounded-full bg-white/20" />
               <span className="flex items-center gap-1"><Globe className="w-3 h-3 md:w-4 md:h-4" /> Web</span>
               <span className="hidden sm:inline w-1 h-1 rounded-full bg-white/20" />
-              <span className="flex items-center gap-1"><Box className="w-3 h-3 md:w-4 md:h-4" /> HTML</span>
+              <span className="flex items-center gap-1"><Code2 className="w-3 h-3 md:w-4 md:h-4" /> HTML</span>
             </div>
           </motion.div>
         </div>
@@ -90,7 +90,7 @@ export default function LandingPage() {
         <div className="container px-4 grid grid-cols-1 md:grid-cols-3 gap-8 mx-auto">
           {[
             { title: 'Lightning Fast', desc: 'Our cloud servers compile your code in seconds, not minutes.', icon: Zap },
-            { title: 'Any Platform', desc: 'Full support for React, HTML, and vanilla web apps.', icon: Globe },
+            { title: 'Any Platform', desc: 'Full support for Website URL, ZIP packages, and HTML code.', icon: Globe },
             { title: 'Secure & Private', desc: 'Your source code is encrypted and deleted immediately after build.', icon: Shield }
           ].map((f, i) => (
             <div key={i} className="glass p-8 rounded-3xl border-white/5 hover:border-blue-500/20 transition-all cursor-default group">
