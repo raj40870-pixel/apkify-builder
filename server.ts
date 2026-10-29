@@ -78,6 +78,11 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Google Search Console Site Verification
+app.get('/google61d8850f40d616b0.html', (req, res) => {
+  res.type('text/html').send('google-site-verification: google61d8850f40d616b0.html');
+});
+
 // Diagnostic endpoint to inspect live environment
 app.get('/api/diag', (req, res) => {
   const run = (cmd: string) => {
