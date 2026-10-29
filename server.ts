@@ -1040,6 +1040,37 @@ app.post('/api/build-apk', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Missing parameters: url is required when not using HTML or ZIP mode.' });
   }
 
+  // ZIP Content Validation: reject Flutter, Android Studio, Backend or non-HTML archives
+  if (zipData && typeof zipData === 'string' && zipData.trim()) {
+    try {
+      const matches = zipData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      const b64 = matches ? matches[2] : zipData;
+      const zipBuffer = Buffer.from(b64, 'base64');
+      const zip = new AdmZip(zipBuffer);
+      const fileNames = zip.getEntries().map(e => e.entryName.toLowerCase());
+
+      const isFlutter = fileNames.some(name => name.includes('pubspec.yaml'));
+      const isNativeAndroid = fileNames.some(name => name.includes('build.gradle') || name.includes('androidmanifest.xml') || name.includes('settings.gradle'));
+      const isBackend = fileNames.some(name => name.includes('manage.py') || name.includes('composer.json') || name.includes('pom.xml') || name.includes('gemfile') || name.includes('requirements.txt'));
+      const hasHtml = fileNames.some(name => name.endsWith('.html'));
+
+      if (isFlutter) {
+        return res.status(400).json({ success: false, error: 'Aapne galat file daali hai! Flutter projects abhi support nahi karta. Sirf frontend HTML, CSS aur JavaScript web projects support karta hai.' });
+      }
+      if (isNativeAndroid) {
+        return res.status(400).json({ success: false, error: 'Aapne galat file daali hai! Native Android Studio (Java/Kotlin) projects abhi support nahi karta. Sirf frontend HTML, CSS aur JavaScript support karta hai.' });
+      }
+      if (isBackend && !hasHtml) {
+        return res.status(400).json({ success: false, error: 'Aapne galat file daali hai! Backend/Fullstack (Python/Node/PHP) projects support nahi karta. Sirf frontend HTML, CSS aur JavaScript support karta hai.' });
+      }
+      if (!hasHtml) {
+        return res.status(400).json({ success: false, error: 'Aapne galat file daali hai! Is ZIP file mein koi HTML file (.html) nahi mili. Abhi sirf HTML, CSS aur JavaScript web projects (index.html ke saath) support karta hai.' });
+      }
+    } catch (zipErr) {
+      return res.status(400).json({ success: false, error: 'Invalid ya corrupt ZIP file upload ki gayi hai.' });
+    }
+  }
+
   // PRD Validation: URL live check (skip for HTML/ZIP mode and localhost)
   const isLocalHost = url && (url.includes('localhost') || url.includes('127.0.0.1'));
   if (!isLocalMode && url && !isLocalHost) {
