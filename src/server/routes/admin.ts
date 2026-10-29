@@ -1,5 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import fs from 'fs/promises';
+import path from 'path';
 import User from '../models/User.js';
 import Build from '../models/Build.js';
 
@@ -197,7 +199,10 @@ router.get('/builds', requireAdmin, async (req: any, res: any) => {
         user_email: b.user_email || (populatedUser ? populatedUser.email : 'Unknown User'),
         user_name: b.user_name || (populatedUser ? populatedUser.fullName : 'Guest'),
         user_id: populatedUser ? populatedUser._id : b.user_id,
-        created_at: b.created_at || b.createdAt
+        created_at: b.created_at || b.createdAt,
+        user_deleted: b.user_deleted || false,
+        user_deleted_at: b.user_deleted_at,
+        vault_expires_at: b.vault_expires_at
       };
     });
 
@@ -207,25 +212,56 @@ router.get('/builds', requireAdmin, async (req: any, res: any) => {
   }
 });
 
-// 7. DELETE /api/admin/builds/:id (Delete individual build)
-router.delete('/builds/:id', requireAdmin, async (req: any, res: any) => {
+// 7. POST /api/admin/builds/:id/restore - Restore soft-deleted build back to user dashboard
+router.post('/builds/:id/restore', requireAdmin, async (req: any, res: any) => {
   try {
     const build = await Build.findById(req.params.id);
     if (!build) return res.status(404).json({ success: false, error: 'Build record not found' });
 
-    await Build.findByIdAndDelete(req.params.id);
-    return res.status(200).json({ success: true, message: 'Build record deleted successfully' });
+    build.user_deleted = false;
+    build.user_deleted_at = undefined;
+    build.vault_expires_at = undefined;
+    if (build.status === 'Deleted') {
+      build.status = 'Completed';
+    }
+    await build.save();
+
+    return res.status(200).json({ success: true, message: `Build "${build.apk_name}" successfully restored to user dashboard!` });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// 8. POST /api/admin/builds/cleanup (Smart Purge of expired/broken builds)
+// 8. DELETE /api/admin/builds/:id (Permanent Delete of build and APK file)
+router.delete('/builds/:id', requireAdmin, async (req: any, res: any) => {
+  try {
+    const build = await Build.findById(req.params.id);
+    if (!build) return res.status(404).json({ success: false, error: 'Build record not found' });
+
+    if (build.downloadUrl) {
+      const fileName = build.downloadUrl.replace('/apks/', '');
+      const filePath = path.join(process.cwd(), 'apks', fileName);
+      try {
+        await fs.unlink(filePath);
+      } catch (_) {}
+    }
+
+    await Build.findByIdAndDelete(req.params.id);
+    return res.status(200).json({ success: true, message: 'Build permanently deleted from system' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 9. POST /api/admin/builds/cleanup (Smart Purge of expired/broken builds, protecting 7-day vault)
 router.post('/builds/cleanup', requireAdmin, async (req: any, res: any) => {
   try {
+    const now = new Date();
     const result = await Build.deleteMany({
       $or: [
-        { status: { $in: ['expired', 'Failed', 'Deleted'] } },
+        { status: 'Failed' },
+        { status: 'Expired' },
+        { user_deleted: true, vault_expires_at: { $lte: now } },
         { downloadUrl: '' },
         { downloadUrl: null },
         { downloadUrl: '#' }

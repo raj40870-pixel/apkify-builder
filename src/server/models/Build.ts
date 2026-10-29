@@ -9,6 +9,9 @@ export interface IBuild extends Document {
   created_at: Date;
   status: string;
   downloadUrl?: string;
+  user_deleted?: boolean;
+  user_deleted_at?: Date;
+  vault_expires_at?: Date;
 }
 
 const buildSchema = new Schema<IBuild>({
@@ -45,6 +48,16 @@ const buildSchema = new Schema<IBuild>({
   downloadUrl: {
     type: String,
     default: ''
+  },
+  user_deleted: {
+    type: Boolean,
+    default: false
+  },
+  user_deleted_at: {
+    type: Date
+  },
+  vault_expires_at: {
+    type: Date
   }
 });
 

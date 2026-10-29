@@ -1294,14 +1294,14 @@ app.get('/api/builds', async (req, res) => {
     console.log('[API] /builds decoded token:', decoded);
     const userId = decoded.id || decoded._id || decoded.sub;
     console.log('[API] /builds extracted userId:', userId);
-    const builds = await Build.find({ user_id: userId, status: { $ne: 'Deleted' } }).sort({ created_at: -1 });
+    const builds = await Build.find({ user_id: userId, user_deleted: { $ne: true }, status: { $ne: 'Deleted' } }).sort({ created_at: -1 });
     return res.status(200).json({ success: true, builds });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// DELETE /api/builds - Clear user build history
+// DELETE /api/builds - Clear user build history (Soft delete into 7-Day Admin Safety Vault)
 app.delete('/api/builds', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -1316,18 +1316,12 @@ app.delete('/api/builds', async (req, res) => {
     const { ids } = req.body || {};
     if (ids && Array.isArray(ids) && ids.length > 0) {
       const buildsToDelete = await Build.find({ _id: { $in: ids }, user_id: userId });
+      const vaultExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       for (const build of buildsToDelete) {
-        if (build.downloadUrl) {
-          const fileName = build.downloadUrl.replace('/apks/', '');
-          const filePath = path.join(process.cwd(), 'apks', fileName);
-          try {
-            await fs.unlink(filePath);
-          } catch (e) {
-            console.error('Failed to delete physical APK file:', e);
-          }
-        }
-        build.status = 'Deleted';
-        build.downloadUrl = '';
+        // Soft delete: User cannot see it anymore, but file is retained for 7 days in Admin Safety Vault
+        build.user_deleted = true;
+        build.user_deleted_at = new Date();
+        build.vault_expires_at = vaultExpiry;
         await build.save();
       }
       return res.status(200).json({ success: true, message: 'Selected history cleared' });
@@ -1339,7 +1333,7 @@ app.delete('/api/builds', async (req, res) => {
   }
 });
 
-// DELETE /api/builds/:id - Clear specific build from history
+// DELETE /api/builds/:id - Clear specific build from user history (Soft delete into 7-Day Admin Safety Vault)
 app.delete('/api/builds/:id', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -1353,18 +1347,10 @@ app.delete('/api/builds/:id', async (req, res) => {
     const build = await Build.findOne({ _id: req.params.id, user_id: decoded.id });
     if (!build) return res.status(404).json({ success: false, error: 'Build not found' });
     
-    if (build.downloadUrl) {
-      const fileName = build.downloadUrl.replace('/apks/', '');
-      const filePath = path.join(process.cwd(), 'apks', fileName);
-      try {
-        await fs.unlink(filePath);
-      } catch (e) {
-        console.error('Failed to delete physical APK file:', e);
-      }
-    }
-    
-    build.status = 'Deleted';
-    build.downloadUrl = '';
+    // Soft delete: User cannot see it anymore, but file is retained for 7 days in Admin Safety Vault
+    build.user_deleted = true;
+    build.user_deleted_at = new Date();
+    build.vault_expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     await build.save();
     
     return res.status(200).json({ success: true, message: 'Build deleted' });
@@ -1372,6 +1358,36 @@ app.delete('/api/builds/:id', async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// Auto-purge builds in Safety Vault after 7-day retention has passed
+const purgeExpiredSafetyVaultBuilds = async () => {
+  try {
+    const now = new Date();
+    const expiredBuilds = await Build.find({
+      user_deleted: true,
+      vault_expires_at: { $lte: now }
+    });
+    
+    if (expiredBuilds.length > 0) {
+      console.log('[SafetyVault] Auto-purging ' + expiredBuilds.length + ' expired vault builds...');
+      for (const build of expiredBuilds) {
+        if (build.downloadUrl) {
+          const fileName = build.downloadUrl.replace('/apks/', '');
+          const filePath = path.join(process.cwd(), 'apks', fileName);
+          try {
+            await fs.promises.unlink(filePath);
+          } catch (_) {}
+        }
+        build.status = 'Expired';
+        build.downloadUrl = '';
+        await build.save();
+      }
+    }
+  } catch (err) {
+    console.error('[SafetyVault] Hourly purge error:', err);
+  }
+};
+setInterval(purgeExpiredSafetyVaultBuilds, 60 * 60 * 1000);
 
 // Final Error Handler
 app.use((err: any, req: any, res: any, next: any) => {

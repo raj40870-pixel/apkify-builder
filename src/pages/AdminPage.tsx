@@ -6,7 +6,7 @@ import {
   AlertCircle, CheckCircle2, Crown, Activity, Key
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import api from '../lib/api';
+import api, { API_BASE_URL } from '../lib/api';
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -126,15 +126,27 @@ export default function AdminPage() {
   };
 
   const handleDeleteBuild = async (buildId: string, apkName: string) => {
-    if (!window.confirm(`Delete build record for: "${apkName}"?`)) return;
+    if (!window.confirm(`Permanently delete build record and APK file for: "${apkName}"? This cannot be undone.`)) return;
     try {
       const res = await api.delete(`/admin/builds/${buildId}`);
       if (res.data.success) {
         setBuilds(builds.filter(b => (b._id || b.id) !== buildId));
-        showActionToast(`Build "${apkName}" deleted`);
+        showActionToast(`Build "${apkName}" permanently deleted`);
       }
     } catch (err: any) {
       setErrorMsg(err.response?.data?.error || 'Failed to delete build');
+    }
+  };
+
+  const handleRestoreBuild = async (buildId: string, apkName: string) => {
+    try {
+      const res = await api.post(`/admin/builds/${buildId}/restore`);
+      if (res.data.success) {
+        setBuilds(builds.map(b => (b._id || b.id) === buildId ? { ...b, user_deleted: false, user_deleted_at: undefined, vault_expires_at: undefined } : b));
+        showActionToast(`Build "${apkName}" restored to user dashboard!`);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || 'Failed to restore build');
     }
   };
 
@@ -542,7 +554,18 @@ export default function AdminPage() {
                           {userName && <div className="text-[10px] text-gray-400">{userName}</div>}
                         </td>
                         <td className="py-4 px-6">
-                          {b.status === 'Completed' ? (
+                          {b.user_deleted ? (
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className="px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 font-bold text-[10px] inline-flex items-center gap-1">
+                                <span>🗑️</span> Deleted by User
+                              </span>
+                              {b.vault_expires_at && (
+                                <span className="text-[10px] text-amber-400/80 font-mono">
+                                  Vault: {Math.max(0, Math.ceil((new Date(b.vault_expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))}d left
+                                </span>
+                              )}
+                            </div>
+                          ) : b.status === 'Completed' ? (
                             <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold text-[10px]">
                               Completed
                             </span>
@@ -560,24 +583,35 @@ export default function AdminPage() {
                           {b.created_at || b.createdAt ? new Date(b.created_at || b.createdAt).toLocaleString() : 'Recent'}
                         </td>
                         <td className="py-4 px-6 text-right">
-                          {b.downloadUrl && b.downloadUrl !== '#' ? (
-                            <a
-                              href={b.downloadUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#00f2fe]/10 hover:bg-[#00f2fe]/20 text-[#00f2fe] border border-[#00f2fe]/30 font-bold text-xs transition-all"
-                            >
-                              <Download className="w-3.5 h-3.5" /> Download
-                            </a>
-                          ) : (
-                            <span className="text-gray-500 text-[11px] italic">No Link</span>
-                          )}
+                          <div className="flex items-center justify-end gap-2">
+                            {b.user_deleted && (
+                              <button
+                                onClick={() => handleRestoreBuild(buildId, b.apk_name || 'App')}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold text-xs transition-all"
+                                title="Restore build back to user dashboard"
+                              >
+                                <RefreshCw className="w-3 h-3" /> Restore
+                              </button>
+                            )}
+                            {b.downloadUrl && b.downloadUrl !== '#' ? (
+                              <a
+                                href={b.downloadUrl.startsWith('http') ? b.downloadUrl : `${API_BASE_URL}${b.downloadUrl}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#00f2fe]/10 hover:bg-[#00f2fe]/20 text-[#00f2fe] border border-[#00f2fe]/30 font-bold text-xs transition-all"
+                              >
+                                <Download className="w-3.5 h-3.5" /> Download
+                              </a>
+                            ) : (
+                              <span className="text-gray-500 text-[11px] italic">Expired</span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-4 px-6 text-right">
                           <button
                             onClick={() => handleDeleteBuild(buildId, b.apk_name || 'App')}
                             className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors"
-                            title="Delete this build record"
+                            title="Permanently wipe this build record"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>

@@ -618,7 +618,7 @@ router.get('/builds', async (req: any, res: any) => {
       decoded = jwt.decode(token);
       if (!decoded) return res.status(401).json({ success: false, error: 'Invalid token format' });
     }
-    const builds = await Build.find({ user_id: decoded.id }).sort({ createdAt: -1 });
+    const builds = await Build.find({ user_id: decoded.id, user_deleted: { $ne: true }, status: { $ne: 'Deleted' } }).sort({ createdAt: -1 });
     return res.status(200).json({ success: true, builds });
   } catch (error: any) {
     return res.status(500).json({ success: false, error: 'Failed to fetch builds' });
