@@ -52,7 +52,7 @@ export default function BuilderPage() {
 
     if (file.size > 100 * 1024 * 1024) {
       setZipStatus('invalid');
-      setZipError('File size 100MB se zyada hai. Maximum limit 100MB hai.');
+      setZipError('File size exceeds 100MB. Maximum allowed limit is 100MB.');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -148,7 +148,7 @@ export default function BuilderPage() {
       return;
     }
     if (activeTab === 'zip' && zipStatus === 'invalid') {
-      alert(zipError || 'Aapne galat file daali hai! Abhi sirf HTML, CSS aur JavaScript web projects support karta hai.');
+      alert(zipError || 'Invalid file uploaded. Currently only HTML, CSS & JavaScript web projects are supported.');
       return;
     }
     if (activeTab === 'url' && !url.trim()) {
@@ -501,7 +501,7 @@ export default function BuilderPage() {
                         <div>
                           <p className="text-sm font-semibold text-red-400">{zipError}</p>
                           <p className="text-xs text-white/50 mt-1">
-                            💡 Solution: Apne project mein se sirf frontend static files (index.html, style.css, script.js, images) ko ZIP karke upload karein.
+                            💡 Solution: Please compress only your frontend static files (index.html, style.css, script.js, and assets) into the ZIP archive.
                           </p>
                         </div>
                       </div>
