@@ -17,10 +17,8 @@ export default function BuilderPage() {
   const [url, setUrl] = useState('');
   const [htmlCode, setHtmlCode] = useState('');
   const [activeTab, setActiveTab] = useState<'zip' | 'url' | 'html'>('url');
-  const [zipFileName, setZipFileName] = useState('');
-  const [zipFileSize, setZipFileSize] = useState('');
-  const [zipStatus, setZipStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
-  const [zipError, setZipError] = useState('');
+  const [selectedZipName, setSelectedZipName] = useState('');
+  const [selectedZipSize, setSelectedZipSize] = useState('');
   const [urlStatus, setUrlStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
   const [urlError, setUrlError] = useState('');
   const [isBuilding, setIsBuilding] = useState(false);
@@ -51,63 +49,65 @@ export default function BuilderPage() {
     if (!file) return;
 
     if (file.size > 100 * 1024 * 1024) {
-      setZipStatus('invalid');
-      setZipError('File size exceeds 100MB. Maximum allowed limit is 100MB.');
+      alert('File size exceeds 100MB. Maximum allowed limit is 100MB.');
       if (fileInputRef.current) fileInputRef.current.value = '';
+      setSelectedZipName('');
       return;
     }
-
-    setZipFileName(file.name);
-    setZipFileSize((file.size / (1024 * 1024)).toFixed(2) + ' MB');
-    setZipStatus('checking');
-    setZipError('');
 
     try {
       const zip = await JSZip.loadAsync(file);
       const fileNames = Object.keys(zip.files).map(name => name.toLowerCase());
 
-      // Check for forbidden / unsupported frameworks
       const isFlutter = fileNames.some(name => name.includes('pubspec.yaml'));
       const isNativeAndroid = fileNames.some(name => name.includes('build.gradle') || name.includes('androidmanifest.xml') || name.includes('settings.gradle'));
+      const isReactNative = fileNames.some(name => name.includes('react-native') || (name.includes('package.json') && !fileNames.some(f => f.endsWith('.html'))));
       const isBackend = fileNames.some(name => name.includes('manage.py') || name.includes('composer.json') || name.includes('pom.xml') || name.includes('gemfile') || name.includes('requirements.txt'));
       const hasHtml = fileNames.some(name => name.endsWith('.html'));
 
       if (isFlutter) {
-        setZipStatus('invalid');
-        setZipError('⚠️ Galat File Daali Hai! Aapne Flutter project upload kiya hai. APKify Builder abhi sirf HTML, CSS aur JavaScript web projects support karta hai.');
+        alert('Unsupported File: Flutter projects are not supported. Only frontend HTML, CSS & JavaScript web packages are supported.');
         if (fileInputRef.current) fileInputRef.current.value = '';
+        setSelectedZipName('');
         return;
       }
 
       if (isNativeAndroid) {
-        setZipStatus('invalid');
-        setZipError('⚠️ Galat File Daali Hai! Aapne Native Android Studio (Java/Kotlin) project upload kiya hai. Abhi sirf frontend HTML, CSS aur JavaScript support karta hai.');
+        alert('Unsupported File: Native Android Studio (Java/Kotlin) projects are not supported. Only frontend HTML, CSS & JavaScript web packages are supported.');
         if (fileInputRef.current) fileInputRef.current.value = '';
+        setSelectedZipName('');
+        return;
+      }
+
+      if (isReactNative && !hasHtml) {
+        alert('Unsupported File: React Native projects are not supported. Only frontend HTML, CSS & JavaScript web packages are supported.');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        setSelectedZipName('');
         return;
       }
 
       if (isBackend && !hasHtml) {
-        setZipStatus('invalid');
-        setZipError('⚠️ Galat File Daali Hai! Backend/Fullstack (Python/PHP/Node) project detected. Abhi sirf frontend HTML, CSS aur JavaScript web assets support karta hai.');
+        alert('Unsupported File: Fullstack/backend projects (Python/Node/PHP) are not supported. Only frontend HTML, CSS & JavaScript web assets are supported.');
         if (fileInputRef.current) fileInputRef.current.value = '';
+        setSelectedZipName('');
         return;
       }
 
       if (!hasHtml) {
-        setZipStatus('invalid');
-        setZipError('⚠️ Galat File Daali Hai! Is ZIP file mein koi HTML file (.html) nahi mili. Abhi sirf HTML, CSS aur JavaScript support karta hai.');
+        alert('Invalid ZIP: No HTML file (.html) found in this archive. Please upload a ZIP containing HTML, CSS & JavaScript web files.');
         if (fileInputRef.current) fileInputRef.current.value = '';
+        setSelectedZipName('');
         return;
       }
 
       // Valid package!
-      setZipStatus('valid');
-      setZipError('');
+      setSelectedZipName(file.name);
+      setSelectedZipSize((file.size / (1024 * 1024)).toFixed(2) + ' MB');
     } catch (err: any) {
       console.error('Error validating ZIP file:', err);
-      setZipStatus('invalid');
-      setZipError('Corrupt ya invalid ZIP file. Please ek valid .zip archive upload karein.');
+      alert('Corrupted or invalid ZIP file. Please upload a valid .zip archive.');
       if (fileInputRef.current) fileInputRef.current.value = '';
+      setSelectedZipName('');
     }
   };
 
@@ -143,14 +143,11 @@ export default function BuilderPage() {
 
   const startBuildSequence = async () => {
     // Basic validation
-    if (activeTab === 'zip' && (!fileInputRef.current?.files || fileInputRef.current.files.length === 0)) {
-      alert('Please upload a ZIP file first');
+    if (activeTab === 'zip' && (!fileInputRef.current?.files || fileInputRef.current.files.length === 0 || !selectedZipName)) {
+      alert('Please upload a valid ZIP file containing HTML, CSS & JavaScript first');
       return;
     }
-    if (activeTab === 'zip' && zipStatus === 'invalid') {
-      alert(zipError || 'Invalid file uploaded. Currently only HTML, CSS & JavaScript web projects are supported.');
-      return;
-    }
+    
     if (activeTab === 'url' && !url.trim()) {
       alert('Please enter a Website URL');
       return;
@@ -444,68 +441,28 @@ export default function BuilderPage() {
                 </div>
 
                 {activeTab === 'zip' ? (
-                  <div className="space-y-4 min-h-[300px] flex flex-col justify-center">
-                    <div 
-                      onClick={() => fileInputRef.current?.click()}
-                      className={`group relative border-2 border-dashed rounded-3xl p-8 text-center transition-all cursor-pointer overflow-hidden flex flex-col justify-center ${
-                        zipStatus === 'valid' 
-                          ? 'border-green-500/50 bg-green-500/[0.03]' 
-                          : zipStatus === 'invalid' 
-                          ? 'border-red-500/50 bg-red-500/[0.03]' 
-                          : 'border-white/10 hover:border-blue-500/40 hover:bg-blue-500/[0.02]'
-                      }`}
-                    >
-                      <div className="relative z-10">
-                        {zipStatus === 'checking' ? (
-                          <div className="py-6 flex flex-col items-center">
-                            <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-3" />
-                            <p className="text-white font-medium">Checking ZIP package contents...</p>
-                            <p className="text-white/40 text-xs mt-1">Verifying HTML, CSS and JavaScript files</p>
-                          </div>
-                        ) : zipStatus === 'valid' ? (
-                          <div className="py-4 flex flex-col items-center">
-                            <div className="w-16 h-16 rounded-2xl bg-green-500/20 flex items-center justify-center mb-3">
-                              <CheckCircle2 className="w-8 h-8 text-green-400" />
-                            </div>
-                            <h3 className="font-bold text-lg text-green-400 mb-1">{zipFileName}</h3>
-                            <p className="text-white/60 text-xs mb-3">{zipFileSize} • HTML, CSS & JS Package Verified ✅</p>
-                            <span className="text-xs text-white/40 underline hover:text-white">Click to choose a different ZIP</span>
-                          </div>
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="group relative border-2 border-dashed border-white/10 rounded-3xl p-12 text-center hover:border-blue-500/40 hover:bg-blue-500/[0.02] transition-all cursor-pointer overflow-hidden min-h-[300px] flex flex-col justify-center"
+                  >
+                    <div className="relative z-10">
+                      <div className="w-20 h-20 rounded-2xl bg-blue-500/10 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-500">
+                        {selectedZipName ? (
+                          <Box className="w-10 h-10 text-green-400" />
                         ) : (
-                          <>
-                            <div className="w-16 h-16 rounded-2xl bg-blue-500/10 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform duration-500">
-                              <Upload className="w-8 h-8 text-blue-500" />
-                            </div>
-                            <h3 className="font-bold text-lg mb-1">Click to upload ZIP</h3>
-                            <p className="text-white/40 text-xs">HTML, CSS & JavaScript frontend package (Max 100MB)</p>
-                          </>
+                          <Upload className="w-10 h-10 text-blue-500" />
                         )}
-
-                        {/* Supported Badges */}
-                        <div className="flex flex-wrap items-center justify-center gap-2 mt-4 text-xs">
-                          <span className="px-2.5 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 font-medium flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Supported: HTML, CSS & JavaScript
-                          </span>
-                          <span className="px-2.5 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-medium flex items-center gap-1">
-                            <XCircle className="w-3 h-3" /> Not Supported: Fullstack or Native (Flutter/Java)
-                          </span>
-                        </div>
                       </div>
-                      <input type="file" ref={fileInputRef} onChange={handleZipChange} className="hidden" accept=".zip" />
+                      <h3 className="font-bold text-lg mb-1">
+                        {selectedZipName ? selectedZipName : 'Click to upload ZIP'}
+                      </h3>
+                      <p className="text-white/30 text-sm">
+                        {selectedZipName 
+                          ? `${selectedZipSize} • Verified HTML/CSS/JS Package (Click to change)` 
+                          : 'Max 100MB • HTML, CSS & JavaScript package'}
+                      </p>
                     </div>
-
-                    {/* Invalid Error Box */}
-                    {zipStatus === 'invalid' && (
-                      <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-start gap-3 text-left">
-                        <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-semibold text-red-400">{zipError}</p>
-                          <p className="text-xs text-white/50 mt-1">
-                            💡 Solution: Please compress only your frontend static files (index.html, style.css, script.js, and assets) into the ZIP archive.
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                    <input type="file" ref={fileInputRef} onChange={handleZipChange} className="hidden" accept=".zip" />
                   </div>
                 ) : activeTab === 'url' ? (
                   <div className="space-y-4 min-h-[300px] flex flex-col justify-center">
