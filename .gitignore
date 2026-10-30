@@ -27,5 +27,3 @@ users-cache.json
 worker-temp/
 apks/
 scratch/
-test_live_apk.cjs
-scripts/
