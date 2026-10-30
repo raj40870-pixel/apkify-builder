@@ -186,24 +186,35 @@ async function main() {
   fs.mkdirSync(path.dirname(assetsConfigPath), { recursive: true });
   fs.writeFileSync(assetsConfigPath, JSON.stringify(capConfig, null, 2));
 
-  // 5.5 Inject Custom App Icon into Android mipmaps
-  if (icon_url && icon_url.length > 0) {
-    console.log(`[Icon] Configuring custom app icon from: ${icon_url}...`);
+  // 5.5 Inject App Icon into Android mipmaps (Custom Icon or Default Official APKify Logo)
+  let effectiveIcon = icon_url;
+  if (!effectiveIcon) {
+    const defaultPng = path.join(workspaceRoot, 'assets', 'apkify_logo.png');
+    const defaultJpg = path.join(workspaceRoot, 'assets', 'apkify_logo.jpg');
+    if (fs.existsSync(defaultPng)) {
+      effectiveIcon = defaultPng;
+    } else if (fs.existsSync(defaultJpg)) {
+      effectiveIcon = defaultJpg;
+    }
+  }
+
+  if (effectiveIcon && effectiveIcon.length > 0) {
+    console.log(`[Icon] Configuring app launcher icon from: ${effectiveIcon}...`);
     try {
       let iconBuffer = null;
-      if (icon_url.startsWith('http://') || icon_url.startsWith('https://')) {
+      if (effectiveIcon.startsWith('http://') || effectiveIcon.startsWith('https://')) {
         const tempIcon = path.join(tempDir, 'custom_icon.png');
         execSync(`curl -L -s -f -o "${tempIcon}" "${icon_url}"`, { stdio: 'inherit' });
         if (fs.existsSync(tempIcon)) iconBuffer = fs.readFileSync(tempIcon);
-      } else if (icon_url.startsWith('data:image')) {
+      } else if (effectiveIcon.startsWith('data:image')) {
         const matches = icon_url.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
         iconBuffer = Buffer.from(matches ? matches[2] : icon_url, 'base64');
       } else {
-        const resolved = path.resolve(workspaceRoot, icon_url);
+        const resolved = path.resolve(workspaceRoot, effectiveIcon);
         if (fs.existsSync(resolved)) {
           iconBuffer = fs.readFileSync(resolved);
-        } else if (fs.existsSync(icon_url)) {
-          iconBuffer = fs.readFileSync(icon_url);
+        } else if (fs.existsSync(effectiveIcon)) {
+          iconBuffer = fs.readFileSync(effectiveIcon);
         }
       }
 
@@ -244,7 +255,7 @@ async function main() {
 
         console.log('[Icon] Custom icon successfully applied to Android launcher targets!');
       } else {
-        console.warn(`[Icon] Icon file could not be read from: ${icon_url}`);
+        console.warn(`[Icon] Icon file could not be read from: ${effectiveIcon}`);
       }
     } catch (iconErr) {
       console.error('[Icon] Error configuring custom app icon:', iconErr);

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Cpu, Zap, Shield, Sparkles, Code2 } from 'lucide-react';
+import { Cpu, Zap, Shield, Sparkles, Code2, Github } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function AboutPage() {
@@ -65,6 +65,27 @@ export default function AboutPage() {
             <li><strong>Database:</strong> MongoDB Atlas (used for secure account authentication, credit limits, and build history records).</li>
             <li><strong>APK Compiler:</strong> Native integration with Capacitor Android, Gradle Wrapper, and Windows-hosted Android SDK toolchains.</li>
           </ul>
+        </section>
+
+        <section>
+          <div className="flex items-center gap-3 mb-4">
+            <Github className="w-6 h-6 text-blue-400" />
+            <h2 className="text-2xl font-bold m-0">Creator & Developer Profile</h2>
+          </div>
+          <p className="text-white/80 leading-relaxed">
+            APKify Builder was built from the ground up by <strong>Kamaljit</strong>, a Computer Science & Engineering student at Lovely Professional University (LPU). Follow my open-source projects, engineering roadmap, and updates on GitHub:
+          </p>
+          <div className="pt-2">
+            <a 
+              href="https://github.com/raj40870-pixel" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-medium text-sm transition-all hover:scale-[1.02] shadow-lg shadow-black/20"
+            >
+              <Github className="w-4 h-4 text-blue-400" />
+              <span>Explore @raj40870-pixel on GitHub &rarr;</span>
+            </a>
+          </div>
         </section>
 
         <section>
