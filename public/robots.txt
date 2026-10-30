@@ -1,0 +1,8 @@
+# Robots.txt for APKify Builder
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /accounts/dashboard
+
+# Sitemap
+Sitemap: https://apkify-builder.vercel.app/sitemap.xml
