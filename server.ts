@@ -289,19 +289,7 @@ async function buildApkViaGitHubActions(
       const localZipPath = path.join(apksDir, `${jobId}_source.zip`);
       await fs.writeFile(localZipPath, zipBuffer);
 
-      // 2. Extract with AdmZip to check if there is an HTML file (like game.html / index.html)
-      const zip = new AdmZip(zipBuffer);
-      const zipEntries = zip.getEntries();
-      
-      const htmlEntry = zipEntries.find(e => !e.isDirectory && e.entryName.toLowerCase().endsWith('.html'));
-      if (htmlEntry) {
-        const textContent = htmlEntry.getData().toString('utf8');
-        if (textContent.length < 60000 && zipEntries.length <= 3) {
-          effectiveHtmlCode = textContent;
-        }
-      }
-
-      // 3. Upload to GitHub as a temporary build asset in repo so runner can access it directly
+      // 2. Upload to GitHub as a temporary build asset in repo so runner can access it directly
       sendProgress(15, 'Uploading project package to build runner...');
       const uploadPath = `uploads/${jobId}.zip`;
       const uploadApiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${uploadPath}`;
@@ -323,6 +311,7 @@ async function buildApkViaGitHubActions(
 
       if (uploadRes.ok) {
         zipUrl = `uploads/${jobId}.zip`;
+        effectiveHtmlCode = ''; // Prevent large multiline inputs in workflow dispatch
         console.log(`[GitHub Actions] Successfully uploaded ${uploadPath} for build ${jobId}`);
       } else {
         const publicHost = process.env.PUBLIC_BACKEND_URL || process.env.API_BASE_URL || 'https://apkify-builder.ai.studio';
@@ -330,6 +319,39 @@ async function buildApkViaGitHubActions(
       }
     } catch (zipErr: any) {
       console.error('[API] Error processing zipData for GitHub Actions:', zipErr);
+    }
+  } else if (htmlCode && htmlCode.trim()) {
+    try {
+      sendProgress(15, 'Packaging HTML code package for cloud runner...');
+      const zip = new AdmZip();
+      zip.addFile('index.html', Buffer.from(htmlCode, 'utf8'));
+      const zipBuffer = zip.toBuffer();
+
+      const uploadPath = `uploads/${jobId}.zip`;
+      const uploadApiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${uploadPath}`;
+      
+      const uploadRes = await fetch(uploadApiUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'APKify-Builder'
+        },
+        body: JSON.stringify({
+          message: `chore: upload html source for ${jobId}`,
+          content: zipBuffer.toString('base64'),
+          branch: 'main'
+        })
+      });
+
+      if (uploadRes.ok) {
+        zipUrl = `uploads/${jobId}.zip`;
+        effectiveHtmlCode = ''; // Packaging into zip protects against GitHub Actions 1024 char input limit
+        console.log(`[GitHub Actions] Successfully uploaded HTML package ${uploadPath} for build ${jobId}`);
+      }
+    } catch (htmlErr: any) {
+      console.error('[API] Error packaging HTML code for GitHub Actions:', htmlErr);
     }
   }
 
