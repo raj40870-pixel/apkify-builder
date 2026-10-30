@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  ShieldCheck, HelpCircle, Wrench, CreditCard, Info
+  ShieldCheck, HelpCircle, Wrench, CreditCard, Info, Github
 } from 'lucide-react';
 import SupportModal from './SupportModal';
 
