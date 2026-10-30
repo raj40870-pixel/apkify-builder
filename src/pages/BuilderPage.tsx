@@ -19,6 +19,9 @@ export default function BuilderPage() {
   const [activeTab, setActiveTab] = useState<'zip' | 'url' | 'html'>('url');
   const [selectedZipName, setSelectedZipName] = useState('');
   const [selectedZipSize, setSelectedZipSize] = useState('');
+  const [selectedIconName, setSelectedIconName] = useState('');
+  const [selectedIconSize, setSelectedIconSize] = useState('');
+  const [selectedIconPreview, setSelectedIconPreview] = useState<string | null>(null);
   const [urlStatus, setUrlStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
   const [urlError, setUrlError] = useState('');
   const [isBuilding, setIsBuilding] = useState(false);
@@ -111,6 +114,40 @@ export default function BuilderPage() {
     }
   };
 
+  
+  const handleIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.includes('png') && !file.type.includes('jpeg') && !file.type.includes('jpg')) {
+      alert('Unsupported format! Please upload a PNG or JPG image file.');
+      if (iconInputRef.current) iconInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Icon file size exceeds 10MB limit. Please upload an image under 10MB.');
+      if (iconInputRef.current) iconInputRef.current.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSelectedIconPreview(reader.result as string);
+      setSelectedIconName(file.name);
+      setSelectedIconSize((file.size / 1024).toFixed(1) + ' KB');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveIcon = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIconPreview(null);
+    setSelectedIconName('');
+    setSelectedIconSize('');
+    if (iconInputRef.current) iconInputRef.current.value = '';
+  };
+
   const [buildProgress, setBuildProgress] = useState(0);
   const [buildStage, setBuildStage] = useState('');
 
@@ -186,7 +223,7 @@ export default function BuilderPage() {
     
     try {
       // Convert icon to base64 if any
-      let uploadedIconUrl = '';
+      let uploadedIconUrl = selectedIconPreview || '';
       if (iconInputRef.current?.files && iconInputRef.current.files.length > 0) {
         setBuildStage('Reading icon file...');
         try {
@@ -581,23 +618,72 @@ export default function BuilderPage() {
               transition={{ delay: 0.3 }}
               className="glass border-white/5 rounded-[40px] overflow-hidden"
             >
-              <div className="p-8 border-b border-white/5 bg-white/[0.02]">
+              <div className="p-8 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
                 <h2 className="text-xl font-bold flex items-center gap-3">
                   <ImageIcon className="w-6 h-6 text-pink-500" />
                   App Icon
                 </h2>
+                {selectedIconPreview ? (
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Icon Uploaded
+                  </span>
+                ) : (
+                  <span className="text-xs text-white/40 font-mono">Optional</span>
+                )}
               </div>
               <div className="p-8">
-                <div 
-                  onClick={() => iconInputRef.current?.click()}
-                  className="group w-full h-32 border-2 border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center hover:border-pink-500/40 hover:bg-pink-500/[0.02] cursor-pointer transition-all"
-                >
-                  <div className="w-12 h-12 bg-pink-500/10 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                    <ImageIcon className="w-6 h-6 text-pink-500" />
+                {selectedIconPreview ? (
+                  <div className="w-full p-4 border border-emerald-500/30 bg-emerald-500/5 rounded-3xl flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-emerald-500/40 shadow-lg shadow-emerald-500/10 shrink-0 bg-black/40 flex items-center justify-center">
+                        <img src={selectedIconPreview} alt="App Icon" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white text-base truncate">{selectedIconName}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-mono">READY</span>
+                        </div>
+                        <p className="text-xs text-white/50 mt-1">{selectedIconSize} • Will be applied to APK</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => iconInputRef.current?.click()}
+                        className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition-all cursor-pointer"
+                      >
+                        Change
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRemoveIcon}
+                        className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-all cursor-pointer"
+                        title="Remove Icon"
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                  <p className="font-bold text-white/80 text-sm">Upload 512x512 PNG or JPG</p>
-                  <input type="file" ref={iconInputRef} className="hidden" accept="image/png, image/jpeg, image/jpg" />
-                </div>
+                ) : (
+                  <div 
+                    onClick={() => iconInputRef.current?.click()}
+                    className="group w-full h-32 border-2 border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center hover:border-pink-500/40 hover:bg-pink-500/[0.02] cursor-pointer transition-all"
+                  >
+                    <div className="w-12 h-12 bg-pink-500/10 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                      <ImageIcon className="w-6 h-6 text-pink-500" />
+                    </div>
+                    <p className="font-bold text-white/80 text-sm">Upload 512x512 PNG or JPG</p>
+                    <p className="text-xs text-white/40 mt-1">Tap to select your custom app icon</p>
+                  </div>
+                )}
+                <input 
+                  type="file" 
+                  ref={iconInputRef} 
+                  onChange={handleIconChange} 
+                  className="hidden" 
+                  accept="image/png, image/jpeg, image/jpg" 
+                />
               </div>
             </motion.div>
           </div>

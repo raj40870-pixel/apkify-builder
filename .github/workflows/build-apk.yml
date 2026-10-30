@@ -27,6 +27,10 @@ on:
         description: 'Uploaded ZIP file URL or path'
         required: false
         default: ''
+      icon_url:
+        description: 'Uploaded Icon file path or URL'
+        required: false
+        default: ''
       is_premium:
         description: 'Is Premium User'
         required: false
@@ -71,6 +75,7 @@ jobs:
           TARGET_URL: ${{ github.event.inputs.target_url }}
           HTML_CODE: ${{ github.event.inputs.html_code }}
           ZIP_URL: ${{ github.event.inputs.zip_url }}
+          ICON_URL: ${{ github.event.inputs.icon_url }}
           IS_PREMIUM: ${{ github.event.inputs.is_premium }}
         run: |
           node scripts/build_runner.cjs

@@ -261,7 +261,8 @@ async function buildApkViaGitHubActions(
   sendProgress: (p: number, s: string, extra?: any) => void,
   htmlCode?: string,
   zipData?: string,
-  isPremium: boolean = false
+  isPremium: boolean = false,
+  iconUrl?: string
 ) {
   const token = process.env.GITHUB_TOKEN;
   const repoOwner = process.env.GITHUB_REPO_OWNER || 'raj40870-pixel';
@@ -332,6 +333,41 @@ async function buildApkViaGitHubActions(
     }
   }
 
+  
+  let iconUploadRelativePath = '';
+  if (iconUrl && iconUrl.trim()) {
+    try {
+      sendProgress(12, 'Processing custom app icon...');
+      const matches = iconUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      const iconB64 = matches ? matches[2] : iconUrl;
+      const iconBuffer = Buffer.from(iconB64, 'base64');
+
+      const iconUploadPath = `uploads/${jobId}_icon.png`;
+      const iconApiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${iconUploadPath}`;
+      const iconRes = await fetch(iconApiUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'APKify-Builder'
+        },
+        body: JSON.stringify({
+          message: `chore: upload icon for ${jobId}`,
+          content: iconBuffer.toString('base64'),
+          branch: 'main'
+        })
+      });
+
+      if (iconRes.ok) {
+        iconUploadRelativePath = iconUploadPath;
+        console.log(`[GitHub Actions] Successfully uploaded ${iconUploadPath} for build ${jobId}`);
+      }
+    } catch (iconErr: any) {
+      console.error('[API] Error uploading icon for GitHub Actions:', iconErr);
+    }
+  }
+
   sendProgress(20, 'Triggering GitHub Actions 16GB Cloud Runner...');
 
   const dispatchUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/build-apk.yml/dispatches`;
@@ -352,6 +388,7 @@ async function buildApkViaGitHubActions(
         target_url: url || '',
         html_code: effectiveHtmlCode || '',
         zip_url: zipUrl || '',
+        icon_url: iconUploadRelativePath || '',
         is_premium: isPremium ? 'true' : 'false'
       }
     })
@@ -465,6 +502,31 @@ async function buildApkLocally(
     await sleep(800);
     sendProgress(45, "Injecting Splash Branding...");
     await sleep(500);
+    
+    if (iconUrl && iconUrl.trim()) {
+      try {
+        sendProgress(42, "Configuring custom app launcher icon...");
+        const matches = iconUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        const b64 = matches ? matches[2] : iconUrl;
+        const iconBuffer = Buffer.from(b64, 'base64');
+        const resDir = path.join(tempDir, 'android', 'app', 'src', 'main', 'res');
+        const mipmapDirs = ['mipmap-mdpi', 'mipmap-hdpi', 'mipmap-xhdpi', 'mipmap-xxhdpi', 'mipmap-xxxhdpi'];
+        for (const dirName of mipmapDirs) {
+          const targetFolder = path.join(resDir, dirName);
+          await fs.mkdir(targetFolder, { recursive: true });
+          await fs.writeFile(path.join(targetFolder, 'ic_launcher.png'), iconBuffer);
+          await fs.writeFile(path.join(targetFolder, 'ic_launcher_round.png'), iconBuffer);
+          await fs.writeFile(path.join(targetFolder, 'ic_launcher_foreground.png'), iconBuffer);
+        }
+        await fs.unlink(path.join(resDir, 'drawable-v24', 'ic_launcher_foreground.xml')).catch(() => {});
+        await fs.unlink(path.join(resDir, 'drawable', 'ic_launcher_foreground.xml')).catch(() => {});
+        await fs.rm(path.join(resDir, 'mipmap-anydpi-v26'), { recursive: true, force: true }).catch(() => {});
+        console.log('[local-build] Custom icon injected into all mipmap directories.');
+      } catch (iconErr) {
+        console.warn('[local-build] Failed to configure custom icon:', iconErr);
+      }
+    }
+
     sendProgress(50, "Injecting WebView URL configuration...");
     await sleep(500);
     sendProgress(55, "Configuring build signing keys...");
@@ -1240,7 +1302,7 @@ app.post('/api/build-apk', async (req, res) => {
     const isPremiumDB = (user && user.role === 'admin') ? true : (user ? !user.watermark_enabled : false);
     
     const buildRunner = process.env.GITHUB_TOKEN
-      ? buildApkViaGitHubActions(jobId, url || '', appName, packageId, sendProgress, htmlCode, zipData, isPremiumDB)
+      ? buildApkViaGitHubActions(jobId, url || '', appName, packageId, sendProgress, htmlCode, zipData, isPremiumDB, iconUrl)
       : buildApkLocally(jobId, url || '', appName, packageId, iconUrl, sendProgress, htmlCode, zipData, isPremiumDB);
 
     buildRunner

@@ -10,6 +10,7 @@ async function main() {
   const html_code = process.env.HTML_CODE || '';
   const zip_url = (process.env.ZIP_URL || '').trim();
   const is_premium = process.env.IS_PREMIUM === 'true';
+  const icon_url = (process.env.ICON_URL || '').trim();
 
   console.log('====================================================');
   console.log(`Starting APK Build Runner for Job: ${job_id}`);
@@ -18,6 +19,7 @@ async function main() {
   console.log(`Target URL: ${target_url}`);
   console.log(`ZIP URL: ${zip_url}`);
   console.log(`Is Premium: ${is_premium}`);
+  console.log(`Icon URL: ${icon_url}`);
   console.log('====================================================');
 
   // Determine build mode
@@ -183,6 +185,72 @@ async function main() {
   const assetsConfigPath = path.join(tempDir, 'android', 'app', 'src', 'main', 'assets', 'capacitor.config.json');
   fs.mkdirSync(path.dirname(assetsConfigPath), { recursive: true });
   fs.writeFileSync(assetsConfigPath, JSON.stringify(capConfig, null, 2));
+
+  // 5.5 Inject Custom App Icon into Android mipmaps
+  if (icon_url && icon_url.length > 0) {
+    console.log(`[Icon] Configuring custom app icon from: ${icon_url}...`);
+    try {
+      let iconBuffer = null;
+      if (icon_url.startsWith('http://') || icon_url.startsWith('https://')) {
+        const tempIcon = path.join(tempDir, 'custom_icon.png');
+        execSync(`curl -L -s -f -o "${tempIcon}" "${icon_url}"`, { stdio: 'inherit' });
+        if (fs.existsSync(tempIcon)) iconBuffer = fs.readFileSync(tempIcon);
+      } else if (icon_url.startsWith('data:image')) {
+        const matches = icon_url.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        iconBuffer = Buffer.from(matches ? matches[2] : icon_url, 'base64');
+      } else {
+        const resolved = path.resolve(workspaceRoot, icon_url);
+        if (fs.existsSync(resolved)) {
+          iconBuffer = fs.readFileSync(resolved);
+        } else if (fs.existsSync(icon_url)) {
+          iconBuffer = fs.readFileSync(icon_url);
+        }
+      }
+
+      if (iconBuffer && iconBuffer.length > 0) {
+        console.log(`[Icon] Injecting custom icon (${(iconBuffer.length / 1024).toFixed(1)} KB) into Android mipmaps...`);
+        const resDir = path.join(tempDir, 'android', 'app', 'src', 'main', 'res');
+        const mipmapDirs = [
+          'mipmap-mdpi',
+          'mipmap-hdpi',
+          'mipmap-xhdpi',
+          'mipmap-xxhdpi',
+          'mipmap-xxxhdpi'
+        ];
+
+        for (const dirName of mipmapDirs) {
+          const targetFolder = path.join(resDir, dirName);
+          fs.mkdirSync(targetFolder, { recursive: true });
+          fs.writeFileSync(path.join(targetFolder, 'ic_launcher.png'), iconBuffer);
+          fs.writeFileSync(path.join(targetFolder, 'ic_launcher_round.png'), iconBuffer);
+          fs.writeFileSync(path.join(targetFolder, 'ic_launcher_foreground.png'), iconBuffer);
+        }
+
+        // Remove vector foregrounds so Android displays the custom bitmap icon
+        const vectorForegroundV24 = path.join(resDir, 'drawable-v24', 'ic_launcher_foreground.xml');
+        if (fs.existsSync(vectorForegroundV24)) {
+          fs.unlinkSync(vectorForegroundV24);
+        }
+        const vectorForegroundDrawable = path.join(resDir, 'drawable', 'ic_launcher_foreground.xml');
+        if (fs.existsSync(vectorForegroundDrawable)) {
+          fs.unlinkSync(vectorForegroundDrawable);
+        }
+
+        // Remove anydpi adaptive xml to ensure all Android versions render custom PNG cleanly
+        const anyDpiDir = path.join(resDir, 'mipmap-anydpi-v26');
+        if (fs.existsSync(anyDpiDir)) {
+          fs.rmSync(anyDpiDir, { recursive: true, force: true });
+        }
+
+        console.log('[Icon] Custom icon successfully applied to Android launcher targets!');
+      } else {
+        console.warn(`[Icon] Icon file could not be read from: ${icon_url}`);
+      }
+    } catch (iconErr) {
+      console.error('[Icon] Error configuring custom app icon:', iconErr);
+    }
+  }
+
 
   // 6. Splash branding
   if (!is_premium) {
