@@ -76,6 +76,8 @@ async function main() {
   const wwwDir = path.join(tempDir, 'www');
   fs.mkdirSync(wwwDir, { recursive: true });
 
+  let indexHtmlContent = '';
+
   if (isZipMode) {
     console.log(`[Step 0/5] Downloading ZIP from ${zip_url}...`);
     const zipPath = path.join(tempDir, 'source.zip');
@@ -84,6 +86,8 @@ async function main() {
         execSync(`curl -L -s -f -o "${zipPath}" "${zip_url}"`, { stdio: 'inherit' });
       } else if (fs.existsSync(zip_url)) {
         fs.copyFileSync(zip_url, zipPath);
+      } else if (fs.existsSync(path.resolve(workspaceRoot, zip_url))) {
+        fs.copyFileSync(path.resolve(workspaceRoot, zip_url), zipPath);
       }
 
       if (fs.existsSync(zipPath)) {
@@ -141,7 +145,7 @@ async function main() {
   } else if (isHtmlMode) {
     fs.writeFileSync(path.join(wwwDir, 'index.html'), html_code);
   } else if (isUrlMode) {
-    const indexHtmlContent = `<!DOCTYPE html>
+    indexHtmlContent = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -277,7 +281,7 @@ public class SplashActivity extends Activity {
   }
 
   // 7. Inject public index.html fallback
-  if (isUrlMode) {
+  if (isUrlMode && indexHtmlContent) {
     const assetsIndexHtml = path.join(tempDir, 'android', 'app', 'src', 'main', 'assets', 'public', 'index.html');
     fs.mkdirSync(path.dirname(assetsIndexHtml), { recursive: true });
     fs.writeFileSync(assetsIndexHtml, indexHtmlContent);
