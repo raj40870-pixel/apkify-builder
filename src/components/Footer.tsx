@@ -26,7 +26,7 @@ export default function Footer() {
               Convert Website URLs, ZIP packages, and HTML code into signed Android APK binaries in 1 click.
             </p>
             <p className="text-xs text-white/40 italic pt-1">
-              Built with ❤️ by <span className="text-white font-medium">Kamaljit (LPU Student)</span>
+              Built with ❤️ by <span className="text-white font-medium">Kamaljit (BCA Student)</span>
             </p>
           </div>
 
