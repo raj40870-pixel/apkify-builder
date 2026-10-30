@@ -204,17 +204,67 @@ async function main() {
       let iconBuffer = null;
       if (effectiveIcon.startsWith('http://') || effectiveIcon.startsWith('https://')) {
         const tempIcon = path.join(tempDir, 'custom_icon.png');
-        execSync(`curl -L -s -f -o "${tempIcon}" "${icon_url}"`, { stdio: 'inherit' });
+        execSync(`curl -L -s -f -o "${tempIcon}" "${effectiveIcon}"`, { stdio: 'inherit' });
         if (fs.existsSync(tempIcon)) iconBuffer = fs.readFileSync(tempIcon);
       } else if (effectiveIcon.startsWith('data:image')) {
-        const matches = icon_url.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-        iconBuffer = Buffer.from(matches ? matches[2] : icon_url, 'base64');
+        const matches = effectiveIcon.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        iconBuffer = Buffer.from(matches ? matches[2] : effectiveIcon, 'base64');
       } else {
         const resolved = path.resolve(workspaceRoot, effectiveIcon);
         if (fs.existsSync(resolved)) {
           iconBuffer = fs.readFileSync(resolved);
         } else if (fs.existsSync(effectiveIcon)) {
           iconBuffer = fs.readFileSync(effectiveIcon);
+        }
+      }
+
+      // Validate PNG magic bytes. Android AAPT2 requires strictly valid PNG for .png mipmap files.
+      if (iconBuffer && iconBuffer.length > 4) {
+        const isPng = (iconBuffer[0] === 0x89 && iconBuffer[1] === 0x50 && iconBuffer[2] === 0x4E && iconBuffer[3] === 0x47);
+        if (!isPng) {
+          console.log('[Icon] Input image is not raw PNG format. Converting to standard PNG for Android AAPT2...');
+          const rawPath = path.join(tempDir, 'raw_icon_input');
+          const pngPath = path.join(tempDir, 'converted_icon.png');
+          fs.writeFileSync(rawPath, iconBuffer);
+
+          let converted = false;
+          // Strategy 1: Python with Pillow (available on Linux / GitHub Actions runners)
+          try {
+            execSync(`python3 -c "from PIL import Image; Image.open('${rawPath}').convert('RGBA').save('${pngPath}')"`, { stdio: 'ignore' });
+            if (fs.existsSync(pngPath)) {
+              iconBuffer = fs.readFileSync(pngPath);
+              converted = true;
+            }
+          } catch (_) {}
+
+          // Strategy 2: ImageMagick convert (pre-installed on Ubuntu runners)
+          if (!converted) {
+            try {
+              execSync(`convert "${rawPath}" "${pngPath}"`, { stdio: 'ignore' });
+              if (fs.existsSync(pngPath)) {
+                iconBuffer = fs.readFileSync(pngPath);
+                converted = true;
+              }
+            } catch (_) {}
+          }
+
+          // Strategy 3: Windows PowerShell System.Drawing (for local Windows builds)
+          if (!converted && process.platform === 'win32') {
+            try {
+              execSync(`powershell -NoProfile -Command "Add-Type -AssemblyName System.Drawing; [System.Drawing.Image]::FromFile('${rawPath}').Save('${pngPath}', [System.Drawing.Imaging.ImageFormat]::Png)"`, { stdio: 'ignore' });
+              if (fs.existsSync(pngPath)) {
+                iconBuffer = fs.readFileSync(pngPath);
+                converted = true;
+              }
+            } catch (_) {}
+          }
+
+          if (converted) {
+            console.log('[Icon] Successfully converted image to valid Android PNG!');
+          } else {
+            console.warn('[Icon] Warning: Could not convert non-PNG image. Skipping custom icon injection to protect AAPT2 build.');
+            iconBuffer = null; // Do not overwrite mipmaps with invalid files
+          }
         }
       }
 
@@ -255,7 +305,7 @@ async function main() {
 
         console.log('[Icon] Custom icon successfully applied to Android launcher targets!');
       } else {
-        console.warn(`[Icon] Icon file could not be read from: ${effectiveIcon}`);
+        console.warn(`[Icon] Icon file could not be read or validated from: ${effectiveIcon}`);
       }
     } catch (iconErr) {
       console.error('[Icon] Error configuring custom app icon:', iconErr);
