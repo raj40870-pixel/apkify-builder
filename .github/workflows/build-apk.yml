@@ -97,3 +97,46 @@ jobs:
           files: ${{ steps.builder.outputs.apk_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-Purge Old APK Assets (Keep Latest 5)
+        if: always() && steps.builder.outcome == 'success'
+        continue-on-error: true
+        run: |
+          node -e '
+            const token = process.env.GITHUB_TOKEN;
+            const repo = process.env.GITHUB_REPOSITORY;
+            (async () => {
+              try {
+                const res = await fetch(`https://api.github.com/repos/${repo}/releases/tags/builds`, {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: "application/vnd.github+json",
+                    "User-Agent": "APKify-Cleanup"
+                  }
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                const assets = data.assets || [];
+                assets.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                const MAX_KEEP = 5;
+                if (assets.length > MAX_KEEP) {
+                  const toDelete = assets.slice(0, assets.length - MAX_KEEP);
+                  for (const a of toDelete) {
+                    console.log(`Auto-purging old APK: ${a.name}`);
+                    await fetch(`https://api.github.com/repos/${repo}/releases/assets/${a.id}`, {
+                      method: "DELETE",
+                      headers: {
+                        Authorization: `Bearer ${token}`,
+                        Accept: "application/vnd.github+json",
+                        "User-Agent": "APKify-Cleanup"
+                      }
+                    });
+                  }
+                }
+              } catch (e) {
+                console.log("Auto-purge warning:", e.message);
+              }
+            })();
+          '
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
