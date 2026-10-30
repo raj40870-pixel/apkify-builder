@@ -28,17 +28,6 @@ export default function Footer() {
             <p className="text-xs text-white/40 italic pt-1">
               Built with ❤️ by <span className="text-white font-medium">Kamaljit (LPU Student)</span>
             </p>
-            <div className="pt-2">
-              <a
-                href="https://github.com/raj40870-pixel"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-xs font-semibold text-white/80 hover:text-white transition-all group"
-              >
-                <Github className="w-3.5 h-3.5 text-white/70 group-hover:text-white group-hover:scale-110 transition-all" />
-                <span>GitHub / @raj40870-pixel</span>
-              </a>
-            </div>
           </div>
 
           {/* 2. Product */}
@@ -109,6 +98,16 @@ export default function Footer() {
                   <Info className="w-3.5 h-3.5 text-purple-400" /> About Developer
                 </Link>
               </li>
+              <li>
+                <a 
+                  href="https://github.com/raj40870-pixel" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="hover:text-purple-400 transition-colors flex items-center gap-1.5"
+                >
+                  <Github className="w-3.5 h-3.5 text-purple-400" /> GitHub
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -125,16 +124,6 @@ export default function Footer() {
             <span>14-Day Auto-Refill Guarantee</span>
             <span>&bull;</span>
             <span>Developer Support Active</span>
-            <span>&bull;</span>
-            <a 
-              href="https://github.com/raj40870-pixel" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="hover:text-white transition-colors flex items-center gap-1 text-white/60"
-            >
-              <Github className="w-3 h-3" />
-              <span>@raj40870-pixel</span>
-            </a>
           </div>
           <div className="text-[11px] text-white/30">
             &copy; {new Date().getFullYear()} APKify Builder. All rights reserved.

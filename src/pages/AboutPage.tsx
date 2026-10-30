@@ -83,7 +83,7 @@ export default function AboutPage() {
               className="inline-flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-medium text-sm transition-all hover:scale-[1.02] shadow-lg shadow-black/20"
             >
               <Github className="w-4 h-4 text-blue-400" />
-              <span>Explore @raj40870-pixel on GitHub &rarr;</span>
+              <span>GitHub &rarr;</span>
             </a>
           </div>
         </section>
