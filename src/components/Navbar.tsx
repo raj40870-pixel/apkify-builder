@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Cpu, LogIn, Github, UserCircle, LogOut, ChevronDown, Wrench, ShieldCheck, HelpCircle } from 'lucide-react';
+import { Cpu, LogIn, UserCircle, LogOut, ChevronDown, Wrench, ShieldCheck, HelpCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -33,16 +33,6 @@ export default function Navbar({ user, onLogout }: NavbarProps) {
         </Link>
 
         <div className="flex items-center gap-4">
-          <a
-            href="https://github.com/raj40870-pixel"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-xs font-semibold text-white/80 hover:text-white transition-all"
-            title="View Developer GitHub Profile"
-          >
-            <Github className="w-4 h-4" />
-            <span className="hidden sm:inline">GitHub</span>
-          </a>
           {user ? (
             <div className="relative">
               <div 
