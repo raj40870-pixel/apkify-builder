@@ -12,6 +12,9 @@ export interface IBuild extends Document {
   user_deleted?: boolean;
   user_deleted_at?: Date;
   vault_expires_at?: Date;
+  active_expires_at?: Date;
+  storage_folder?: string;
+  delete_type?: string;
 }
 
 const buildSchema = new Schema<IBuild>({
@@ -58,6 +61,17 @@ const buildSchema = new Schema<IBuild>({
   },
   vault_expires_at: {
     type: Date
+  },
+  active_expires_at: {
+    type: Date
+  },
+  storage_folder: {
+    type: String,
+    default: 'apks'
+  },
+  delete_type: {
+    type: String,
+    default: 'none'
   }
 });
 

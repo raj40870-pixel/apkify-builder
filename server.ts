@@ -53,7 +53,37 @@ const execAsync = promisify(exec);
 
 const app = express();
 mkdirSync(path.join(process.cwd(), 'apks'), { recursive: true });
+mkdirSync(path.join(process.cwd(), 'removed_apks'), { recursive: true });
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+
+// Helper to safely move or delete APK files between apks/ and removed_apks/
+async function handleApkFileMovement(downloadUrl: string | undefined, targetAction: 'move_to_removed' | 'permanent_delete') {
+  if (!downloadUrl) return;
+  const match = downloadUrl.match(/\/apks\/([^\/?#]+)/);
+  const fileName = match ? match[1] : path.basename(downloadUrl);
+  if (!fileName || !fileName.endsWith('.apk')) return;
+
+  const activePath = path.join(process.cwd(), 'apks', fileName);
+  const removedPath = path.join(process.cwd(), 'removed_apks', fileName);
+
+  try {
+    if (targetAction === 'move_to_removed') {
+      if (existsSync(activePath)) {
+        await fs.rename(activePath, removedPath).catch(async () => {
+          await fs.copyFile(activePath, removedPath);
+          await fs.unlink(activePath).catch(() => {});
+        });
+        console.log(`[StorageEngine] Moved APK "${fileName}" from apks/ to removed_apks/ (7-Day Backup Vault)`);
+      }
+    } else if (targetAction === 'permanent_delete') {
+      if (existsSync(activePath)) await fs.unlink(activePath).catch(() => {});
+      if (existsSync(removedPath)) await fs.unlink(removedPath).catch(() => {});
+      console.log(`[StorageEngine] Permanently deleted APK "${fileName}" from storage`);
+    }
+  } catch (err: any) {
+    console.warn(`[StorageEngine] APK file operation (${targetAction}) note:`, err.message);
+  }
+}
 
 app.use(cors({
   origin: '*',
@@ -1336,6 +1366,7 @@ app.post('/api/build-apk', async (req, res) => {
             ? resultUrl
             : `/apks/${apkFilename}`;
 
+          const activeExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30-Day Active Retention
           await Build.create({
             id: jobId,
             user_id: finalUserId,
@@ -1343,7 +1374,10 @@ app.post('/api/build-apk', async (req, res) => {
             user_name: user ? user.fullName : '',
             apk_name: appName,
             status: 'Completed',
-            downloadUrl: finalDownloadUrl
+            downloadUrl: finalDownloadUrl,
+            active_expires_at: activeExpiry,
+            storage_folder: 'apks',
+            user_deleted: false
           }).catch((err) => console.error('[API] Failed to save build history:', err));
           
           if (user) {
@@ -1386,7 +1420,7 @@ app.get('/api/builds', async (req, res) => {
   }
 });
 
-// DELETE /api/builds - Clear user build history (Soft delete into 7-Day Admin Safety Vault)
+// DELETE /api/builds - User build history deletion (Permanent or Move to 7-Day Removed Folder)
 app.delete('/api/builds', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -1398,18 +1432,32 @@ app.delete('/api/builds', async (req, res) => {
     if (!decoded) return res.status(401).json({ success: false, error: 'Invalid token' });
     
     const userId = decoded.id || decoded._id || decoded.sub;
-    const { ids } = req.body || {};
+    const { ids, deleteType = 'for_me' } = req.body || {};
     if (ids && Array.isArray(ids) && ids.length > 0) {
       const buildsToDelete = await Build.find({ _id: { $in: ids }, user_id: userId });
       const vaultExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      
       for (const build of buildsToDelete) {
-        // Soft delete: User cannot see it anymore, but file is retained for 7 days in Admin Safety Vault
-        build.user_deleted = true;
-        build.user_deleted_at = new Date();
-        build.vault_expires_at = vaultExpiry;
-        await build.save();
+        if (deleteType === 'permanent') {
+          await handleApkFileMovement(build.downloadUrl, 'permanent_delete');
+          await Build.deleteOne({ _id: build._id });
+        } else {
+          // 'for_me': Soft-delete to 7-Day Removed Folder
+          build.user_deleted = true;
+          build.user_deleted_at = new Date();
+          build.vault_expires_at = vaultExpiry;
+          build.delete_type = 'for_me';
+          build.storage_folder = 'removed_apks';
+          await handleApkFileMovement(build.downloadUrl, 'move_to_removed');
+          await build.save();
+        }
       }
-      return res.status(200).json({ success: true, message: 'Selected history cleared' });
+      return res.status(200).json({ 
+        success: true, 
+        message: deleteType === 'permanent' 
+          ? 'Selected builds permanently wiped' 
+          : 'Selected builds moved to 7-day backup vault' 
+      });
     } else {
       return res.status(400).json({ success: false, error: 'No IDs provided to delete' });
     }
@@ -1418,7 +1466,7 @@ app.delete('/api/builds', async (req, res) => {
   }
 });
 
-// DELETE /api/builds/:id - Clear specific build from user history (Soft delete into 7-Day Admin Safety Vault)
+// DELETE /api/builds/:id - Clear specific build from user history (Permanent or Move to 7-Day Removed Folder)
 app.delete('/api/builds/:id', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -1432,47 +1480,99 @@ app.delete('/api/builds/:id', async (req, res) => {
     const build = await Build.findOne({ _id: req.params.id, user_id: decoded.id });
     if (!build) return res.status(404).json({ success: false, error: 'Build not found' });
     
-    // Soft delete: User cannot see it anymore, but file is retained for 7 days in Admin Safety Vault
-    build.user_deleted = true;
-    build.user_deleted_at = new Date();
-    build.vault_expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await build.save();
-    
-    return res.status(200).json({ success: true, message: 'Build deleted' });
+    const deleteType = req.body?.deleteType || req.query?.deleteType || 'for_me';
+
+    if (deleteType === 'permanent') {
+      await handleApkFileMovement(build.downloadUrl, 'permanent_delete');
+      await Build.deleteOne({ _id: build._id });
+      return res.status(200).json({ success: true, message: 'Build permanently wiped from system' });
+    } else {
+      // Soft delete: User cannot see it anymore, but file is retained for 7 days in removed_apks/
+      build.user_deleted = true;
+      build.user_deleted_at = new Date();
+      build.vault_expires_at = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      build.delete_type = 'for_me';
+      build.storage_folder = 'removed_apks';
+      await handleApkFileMovement(build.downloadUrl, 'move_to_removed');
+      await build.save();
+      return res.status(200).json({ success: true, message: 'Build moved to 7-day backup vault' });
+    }
   } catch (error: any) {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Auto-purge builds in Safety Vault after 7-day retention has passed
-const purgeExpiredSafetyVaultBuilds = async () => {
+// Comprehensive Auto-Purge & Storage Management Engine
+const runSmartStoragePurgeEngine = async () => {
   try {
     const now = new Date();
-    const expiredBuilds = await Build.find({
+    console.log('[StorageEngine] Running scheduled storage hygiene check...');
+
+    // 1. Purge 7-Day Expired Vault APKs in removed_apks/
+    const expiredVaultBuilds = await Build.find({
       user_deleted: true,
       vault_expires_at: { $lte: now }
     });
     
-    if (expiredBuilds.length > 0) {
-      console.log('[SafetyVault] Auto-purging ' + expiredBuilds.length + ' expired vault builds...');
-      for (const build of expiredBuilds) {
-        if (build.downloadUrl) {
-          const fileName = build.downloadUrl.replace('/apks/', '');
-          const filePath = path.join(process.cwd(), 'apks', fileName);
-          try {
-            await fs.promises.unlink(filePath);
-          } catch (_) {}
-        }
+    if (expiredVaultBuilds.length > 0) {
+      console.log(`[StorageEngine] Auto-purging ${expiredVaultBuilds.length} expired vault builds (7-Day retention passed)...`);
+      for (const build of expiredVaultBuilds) {
+        await handleApkFileMovement(build.downloadUrl, 'permanent_delete');
+        await Build.deleteOne({ _id: build._id });
+      }
+    }
+
+    // 2. Purge 30-Day Expired Active Builds in apks/
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const expiredActiveBuilds = await Build.find({
+      user_deleted: { $ne: true },
+      $or: [
+        { active_expires_at: { $lte: now } },
+        { created_at: { $lte: thirtyDaysAgo } }
+      ],
+      status: 'Completed'
+    });
+
+    if (expiredActiveBuilds.length > 0) {
+      console.log(`[StorageEngine] Auto-purging ${expiredActiveBuilds.length} active builds past 30-day retention...`);
+      for (const build of expiredActiveBuilds) {
+        await handleApkFileMovement(build.downloadUrl, 'permanent_delete');
         build.status = 'Expired';
         build.downloadUrl = '';
         await build.save();
       }
     }
-  } catch (err) {
-    console.error('[SafetyVault] Hourly purge error:', err);
+
+    // 3. Storage Overflow FIFO Protection for removed_apks/
+    const removedApksDir = path.join(process.cwd(), 'removed_apks');
+    if (existsSync(removedApksDir)) {
+      const files = await fs.readdir(removedApksDir);
+      const apkFiles = files.filter(f => f.endsWith('.apk'));
+      const MAX_REMOVED_FILES = 30; // Safety cap
+      if (apkFiles.length > MAX_REMOVED_FILES) {
+        console.log(`[StorageEngine] removed_apks count (${apkFiles.length}) exceeds safety limit (${MAX_REMOVED_FILES}). Applying FIFO prune...`);
+        const fileStats = await Promise.all(
+          apkFiles.map(async (f) => {
+            const p = path.join(removedApksDir, f);
+            const stat = await fs.stat(p).catch(() => null);
+            return { file: f, path: p, mtime: stat ? stat.mtimeMs : 0 };
+          })
+        );
+        fileStats.sort((a, b) => a.mtime - b.mtime); // Oldest first
+        const toDelete = fileStats.slice(0, apkFiles.length - MAX_REMOVED_FILES);
+        for (const item of toDelete) {
+          await fs.unlink(item.path).catch(() => {});
+          console.log(`[StorageEngine] Pruned oldest vault file: ${item.file}`);
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error('[StorageEngine] Error during storage purge cycle:', err.message);
   }
 };
-setInterval(purgeExpiredSafetyVaultBuilds, 60 * 60 * 1000);
+
+setTimeout(runSmartStoragePurgeEngine, 10000);
+setInterval(runSmartStoragePurgeEngine, 60 * 60 * 1000);
 
 // Final Error Handler
 app.use((err: any, req: any, res: any, next: any) => {

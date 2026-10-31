@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Camera, Box, LogOut, Shield, User as UserIcon, Clock, Trash2, Download } from 'lucide-react';
+import { Camera, Box, LogOut, Shield, User as UserIcon, Clock, Trash2, Download, Archive, X } from 'lucide-react';
 import { User as UserType } from '../types';
 import { logout, getStoredUser, fetchMe } from '../lib/auth';
 import { fetchBuildHistory, deleteBuildsAPI } from '../lib/freeCreditSystem';
@@ -25,6 +25,10 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
   });
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [targetBuildIds, setTargetBuildIds] = useState<string[]>([]);
+  const [targetBuildName, setTargetBuildName] = useState<string>('');
+  const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -82,7 +86,37 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
     setSelectedIds([]);
   };
 
-  const handleDeleteSelected = async () => {
+  const handleOpenDeleteModal = (ids: string[], name: string) => {
+    setTargetBuildIds(ids);
+    setTargetBuildName(name);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async (type: 'permanent' | 'for_me') => {
+    if (targetBuildIds.length === 0) return;
+    setIsDeleting(true);
+    try {
+      const success = await deleteBuildsAPI(targetBuildIds, type);
+      if (success) {
+        setHistory(prev => prev.filter(b => !targetBuildIds.includes(b.id)));
+        if (isSelectionMode) cancelSelectionMode();
+        setDeleteModalOpen(false);
+      } else {
+        alert('Failed to delete build history');
+      }
+    } catch (e: any) {
+      alert('Error during delete: ' + (e?.message || 'Unknown error'));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
+    handleOpenDeleteModal(selectedIds, `${selectedIds.length} selected apps`);
+  };
+
+  const _oldHandleDeleteSelected = async () => {
     if (selectedIds.length === 0) return;
     if (window.confirm('Are you sure you want to permanently delete the selected APK history?')) {
       const success = await deleteBuildsAPI(selectedIds);
@@ -342,6 +376,24 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
                        }`}>
                          {build.status} {build.status === 'Building' ? `(${build.progress || 0}%)` : ''}
                        </span>
+                       {build.status === 'Completed' && (() => {
+                         const createdTime = new Date(build.created_at).getTime();
+                         const daysPassed = (Date.now() - createdTime) / (1000 * 60 * 60 * 24);
+                         const daysLeft = Math.max(1, Math.ceil(30 - daysPassed));
+                         return (
+                           <span className="text-[11px] font-medium text-amber-300/80 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm" title="Stored in active backup for 30 days">
+                             <Clock className="w-3 h-3 text-amber-400" />
+                             {daysLeft}d left
+                           </span>
+                         );
+                       })()}
+                       <button
+                         onClick={() => handleOpenDeleteModal([build.id], build.app_name)}
+                         className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-colors ml-1"
+                         title="Delete this APK build"
+                       >
+                         <Trash2 className="w-3.5 h-3.5" />
+                       </button>
                        <span className="text-xs text-white/20 flex items-center gap-1">
                          <Clock className="w-3 h-3" />
                          {new Date(build.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -352,8 +404,102 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
               </div>
             )}
           </motion.div>
-        </div>
+            </div>
       </div>
+      {/* 2-Option Delete Confirmation Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass border border-white/15 bg-neutral-900/95 max-w-md w-full rounded-3xl p-6 shadow-2xl relative overflow-hidden text-left"
+          >
+            {/* Close button */}
+            <button
+              onClick={() => !isDeleting && setDeleteModalOpen(false)}
+              className="absolute top-5 right-5 text-white/40 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white font-display">Delete APK Build</h3>
+                <p className="text-xs text-white/50 truncate max-w-[240px]">
+                  {targetBuildName}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-sm text-white/70 mb-5 leading-relaxed">
+              Choose how you want to remove this build from your account:
+            </p>
+
+            <div className="space-y-3 mb-6">
+              {/* Option 1: Delete for Me (7 Days Vault) */}
+              <button
+                disabled={isDeleting}
+                onClick={() => handleConfirmDelete('for_me')}
+                className="w-full text-left p-4 rounded-2xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-all group flex items-start gap-3.5 relative disabled:opacity-50"
+              >
+                <div className="w-9 h-9 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 flex-shrink-0 mt-0.5">
+                  <Archive className="w-4 h-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white text-sm group-hover:text-blue-300 transition-colors">
+                      Delete for Me
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      7-Day Vault
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/50 mt-1 leading-relaxed">
+                    Hides from your active dashboard. Kept in 7-day backup vault (<code className="text-blue-300/80 text-[11px]">removed_apks</code>), then auto-purged on day 7.
+                  </p>
+                </div>
+              </button>
+
+              {/* Option 2: Permanent Delete (Instant Wipe) */}
+              <button
+                disabled={isDeleting}
+                onClick={() => handleConfirmDelete('permanent')}
+                className="w-full text-left p-4 rounded-2xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-all group flex items-start gap-3.5 relative disabled:opacity-50"
+              >
+                <div className="w-9 h-9 rounded-xl bg-red-500/20 flex items-center justify-center text-red-400 flex-shrink-0 mt-0.5">
+                  <Trash2 className="w-4 h-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white text-sm group-hover:text-red-300 transition-colors">
+                      Delete Permanently
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">
+                      Instant Wipe
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/50 mt-1 leading-relaxed">
+                    Instantly wipes the APK file and data completely from disk and database. Cannot be recovered.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                disabled={isDeleting}
+                onClick={() => setDeleteModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

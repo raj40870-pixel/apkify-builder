@@ -12,7 +12,7 @@ export const fetchBuildHistory = async () => {
   return [];
 };
 
-export const deleteBuildsAPI = async (ids: string[]) => {
+export const deleteBuildsAPI = async (ids: string[], deleteType: 'permanent' | 'for_me' = 'for_me') => {
   const token = getAuthToken();
   if (!token) return false;
   const res = await fetch(`${API_BASE_URL}/api/builds`, {
@@ -21,7 +21,7 @@ export const deleteBuildsAPI = async (ids: string[]) => {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}` 
     },
-    body: JSON.stringify({ ids })
+    body: JSON.stringify({ ids, deleteType })
   });
   const json = await res.json();
   return json.success;
