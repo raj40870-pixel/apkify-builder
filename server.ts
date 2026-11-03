@@ -283,6 +283,42 @@ async function ensureLinuxJavaAndSdk(sendProgress: (p: number, s: string) => voi
   console.log('[AutoSdk] Android SDK ready at:', sdkHome);
 }
 
+async function purgeGitHubAsset(token: string, repoOwner: string, repoName: string, filePath: string) {
+  try {
+    const getUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`;
+    const getRes = await fetch(getUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'APKify-Builder'
+      }
+    });
+    if (getRes.ok) {
+      const data: any = await getRes.json();
+      const sha = data.sha;
+      if (sha) {
+        await fetch(getUrl, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json',
+            'User-Agent': 'APKify-Builder'
+          },
+          body: JSON.stringify({
+            message: `chore: auto-purge ephemeral asset ${filePath}`,
+            sha,
+            branch: 'main'
+          })
+        });
+        console.log(`[Auto-Purge] Deleted ${filePath} from GitHub repository.`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[Auto-Purge Warning] Failed to delete ${filePath}:`, err.message);
+  }
+}
+
 async function buildApkViaGitHubActions(
   jobId: string,
   url: string,
@@ -306,6 +342,7 @@ async function buildApkViaGitHubActions(
 
   let effectiveHtmlCode = htmlCode || '';
   let zipUrl = '';
+  const ephemeralUploads: string[] = [];
 
   if (zipData && zipData.trim()) {
     try {
@@ -341,6 +378,7 @@ async function buildApkViaGitHubActions(
 
       if (uploadRes.ok) {
         zipUrl = `uploads/${jobId}.zip`;
+        ephemeralUploads.push(uploadPath);
         effectiveHtmlCode = ''; // Prevent large multiline inputs in workflow dispatch
         console.log(`[GitHub Actions] Successfully uploaded ${uploadPath} for build ${jobId}`);
       } else {
@@ -377,6 +415,7 @@ async function buildApkViaGitHubActions(
 
       if (uploadRes.ok) {
         zipUrl = `uploads/${jobId}.zip`;
+        ephemeralUploads.push(uploadPath);
         effectiveHtmlCode = ''; // Packaging into zip protects against GitHub Actions 1024 char input limit
         console.log(`[GitHub Actions] Successfully uploaded HTML package ${uploadPath} for build ${jobId}`);
       }
@@ -413,6 +452,7 @@ async function buildApkViaGitHubActions(
 
       if (iconRes.ok) {
         iconUploadRelativePath = iconUploadPath;
+        ephemeralUploads.push(iconUploadPath);
         console.log(`[GitHub Actions] Successfully uploaded ${iconUploadPath} for build ${jobId}`);
       }
     } catch (iconErr: any) {
@@ -421,6 +461,7 @@ async function buildApkViaGitHubActions(
   }
 
   sendProgress(20, 'Triggering GitHub Actions 16GB Cloud Runner...');
+  try {
 
   const dispatchUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/build-apk.yml/dispatches`;
   const dispatchRes = await fetch(dispatchUrl, {
@@ -525,7 +566,18 @@ async function buildApkViaGitHubActions(
     downloadUrl: directDownloadUrl
   });
 
-  return directDownloadUrl;
+    return directDownloadUrl;
+  } finally {
+    // Zero-trace ephemeral cleanup: instantly delete user zip & icon from GitHub repository
+    (async () => {
+      for (const filePath of ephemeralUploads) {
+        await purgeGitHubAsset(token, repoOwner, repoName, filePath).catch(() => {});
+      }
+      const apksDir = path.join(process.cwd(), 'apks');
+      const localZipPath = path.join(apksDir, `${jobId}_source.zip`);
+      await fs.unlink(localZipPath).catch(() => {});
+    })().catch(() => {});
+  }
 }
 
 async function buildApkLocally(

@@ -98,6 +98,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+
+
       - name: Auto-Purge Old APK Assets (Keep Latest 5)
         if: always() && steps.builder.outcome == 'success'
         continue-on-error: true
@@ -140,3 +142,20 @@ jobs:
           '
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-Purge Ephemeral User Uploads (Zero-Trace Security)
+        if: always()
+        continue-on-error: true
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git pull origin main || true
+          rm -f uploads/${{ github.event.inputs.job_id }}* || true
+          if [ -n "$(git status --porcelain uploads/ 2>/dev/null)" ]; then
+            git add uploads/
+            git commit -m "chore(security): purge ephemeral user source for ${{ github.event.inputs.job_id }} [skip ci]" || true
+            git push origin HEAD || true
+          fi
+
+
+
