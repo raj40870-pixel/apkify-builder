@@ -27,3 +27,5 @@ users-cache.json
 worker-temp/
 apks/
 scratch/
+
+.vercel
