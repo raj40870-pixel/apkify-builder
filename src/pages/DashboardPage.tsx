@@ -16,6 +16,8 @@ interface DashboardPageProps {
 export default function DashboardPage({ user, onLogout: parentOnLogout }: DashboardPageProps) {
   const navigate = useNavigate();
   const [profileImage, setProfileImage] = useState<string | null>(user?.photoURL || null);
+  const [liveUser, setLiveUser] = useState<any>(user);
+  const currentUser = liveUser || user;
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [creditState, setCreditState] = useState({ 
@@ -35,6 +37,7 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
     // Fetch live user state on load
     fetchMe().then((u) => {
       if (u) {
+        setLiveUser(u);
         setCreditState(prev => ({ 
           ...prev, 
           creditsRemaining: u.credits_remaining ?? 5,
@@ -215,34 +218,64 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
             </div>
             <p className="text-white/40 text-xs uppercase tracking-widest font-bold mb-3">Subscription</p>
             <h3 className="text-2xl font-bold text-white mb-2">
-              {user.plan || 'Free'} Plan
+              {currentUser.plan || 'Free'} Plan
             </h3>
             
-            <div className="space-y-3 mt-4">
-               <div className="flex justify-between items-center text-sm">
+            <div className="space-y-3.5 mt-5">
+               <div className="flex justify-between items-center text-sm py-1 border-b border-white/[0.04]">
                  <span className="text-white/60">APK Build Credits:</span>
-                 <span className="font-bold text-white">{creditState.creditsRemaining} / {creditState.creditsLimit}</span>
+                 <span className="font-mono font-bold text-xs text-[#00f2fe] bg-[#00f2fe]/10 border border-[#00f2fe]/20 px-2.5 py-0.5 rounded-full">
+                   {creditState.creditsRemaining} / {creditState.creditsLimit}
+                 </span>
                </div>
-               <div className="flex justify-between items-center text-sm">
+               
+               <div className="flex justify-between items-center text-sm py-1 border-b border-white/[0.04]">
                  <span className="text-white/60">History Usage:</span>
-                 <span className="font-bold text-white">{history.length} / {creditState.historyLimit}</span>
+                 <span className="font-mono font-semibold text-white/90 text-xs">
+                   {history.length} / {creditState.historyLimit}
+                 </span>
                </div>
-               {(!user.plan || user.plan === 'Free' || user.plan.toLowerCase() === 'free') ? (
-                 <div className="flex justify-between items-center text-sm">
-                   <span className="text-white/60">Renewal:</span>
-                   <span className="font-bold text-white">
-                     {user.last_credit_refill ? (() => {
-                       const d = new Date(user.last_credit_refill);
-                       d.setDate(d.getDate() + 14);
-                       return `Every 14 Days (${d.toLocaleDateString()})`;
-                     })() : 'Every 14 Days'}
-                   </span>
-                 </div>
-               ) : user.plan_expiry_date ? (
-                 <div className="flex justify-between items-center text-sm">
+
+               {(!currentUser.plan || currentUser.plan === 'Free' || currentUser.plan.toLowerCase() === 'free') ? (
+                 <>
+                   <div className="flex justify-between items-center text-sm py-1 border-b border-white/[0.04]">
+                     <span className="text-white/60">Auto-Renewal:</span>
+                     <span className="font-medium text-white/90 text-xs">Every 14 Days</span>
+                   </div>
+                   
+                   <div className="flex justify-between items-center text-sm py-1">
+                     <span className="text-white/60">Next Refill:</span>
+                     {(() => {
+                       const refillSource = currentUser.last_credit_refill || user?.last_credit_refill;
+                       if (!refillSource) {
+                         return <span className="font-mono text-xs text-white/60">In 14 Days</span>;
+                       }
+                       const refillDate = new Date(refillSource);
+                       refillDate.setDate(refillDate.getDate() + 14);
+                       const diffMs = refillDate.getTime() - Date.now();
+                       const diffDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+                       const formattedDate = refillDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+                       
+                       return (
+                         <div className="flex items-center gap-1.5">
+                           <span className="font-mono text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
+                             {formattedDate}
+                           </span>
+                           {diffDays > 0 ? (
+                             <span className="text-[11px] font-medium text-white/40 font-mono">({diffDays}d)</span>
+                           ) : (
+                             <span className="text-[11px] font-semibold text-emerald-400">(Today)</span>
+                           )}
+                         </div>
+                       );
+                     })()}
+                   </div>
+                 </>
+               ) : currentUser.plan_expiry_date ? (
+                 <div className="flex justify-between items-center text-sm py-1">
                    <span className="text-white/60">Plan Expires:</span>
-                   <span className="font-bold text-white">
-                     {new Date(user.plan_expiry_date).toLocaleDateString()}
+                   <span className="font-mono text-xs font-semibold text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2.5 py-0.5 rounded-full">
+                     {new Date(currentUser.plan_expiry_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                    </span>
                  </div>
                ) : null}
