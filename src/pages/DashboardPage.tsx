@@ -19,8 +19,8 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [creditState, setCreditState] = useState({ 
-    creditsRemaining: getStoredUser()?.credits_remaining ?? 3, 
-    creditsLimit: getStoredUser()?.plan === 'Agency' ? 1000 : getStoredUser()?.plan === 'Pro' ? 200 : getStoredUser()?.plan === 'Basic' ? 50 : 3, 
+    creditsRemaining: getStoredUser()?.credits_remaining ?? 5, 
+    creditsLimit: getStoredUser()?.plan === 'Agency' ? 1000 : getStoredUser()?.plan === 'Pro' ? 200 : getStoredUser()?.plan === 'Basic' ? 50 : 5, 
     historyLimit: getStoredUser()?.history_limit ?? 10 
   });
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -37,8 +37,8 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
       if (u) {
         setCreditState(prev => ({ 
           ...prev, 
-          creditsRemaining: u.credits_remaining ?? 3,
-          creditsLimit: u.plan === 'Agency' ? 1000 : u.plan === 'Pro' ? 200 : u.plan === 'Basic' ? 50 : 3,
+          creditsRemaining: u.credits_remaining ?? 5,
+          creditsLimit: u.plan === 'Agency' ? 1000 : u.plan === 'Pro' ? 200 : u.plan === 'Basic' ? 50 : 5,
           historyLimit: u.history_limit ?? 10
         }));
       }
@@ -230,7 +230,13 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
                {(!user.plan || user.plan === 'Free' || user.plan.toLowerCase() === 'free') ? (
                  <div className="flex justify-between items-center text-sm">
                    <span className="text-white/60">Renewal:</span>
-                   <span className="font-bold text-white">Every 14 Days</span>
+                   <span className="font-bold text-white">
+                     {user.last_credit_refill ? (() => {
+                       const d = new Date(user.last_credit_refill);
+                       d.setDate(d.getDate() + 14);
+                       return `Every 14 Days (${d.toLocaleDateString()})`;
+                     })() : 'Every 14 Days'}
+                   </span>
                  </div>
                ) : user.plan_expiry_date ? (
                  <div className="flex justify-between items-center text-sm">

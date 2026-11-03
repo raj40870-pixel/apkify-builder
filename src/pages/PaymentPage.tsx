@@ -165,7 +165,7 @@ export default function PaymentPage() {
                 <span>
                   {plan === 'Pro' ? '200 APK Builds' : 
                    plan === 'Agency' || plan === 'Unlimited' ? '1000 APK Builds' : 
-                   plan === 'Starter' || plan === 'Basic' ? '50 APK Builds' : '3 APK Builds'}
+                   plan === 'Starter' || plan === 'Basic' ? '50 APK Builds' : '5 APK Builds'}
                 </span>
               </div>
               <div className="flex items-center gap-3 text-sm text-white/80">

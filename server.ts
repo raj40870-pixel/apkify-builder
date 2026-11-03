@@ -13,7 +13,7 @@ import fs from 'fs/promises';
 import { existsSync, mkdirSync, realpathSync, readdirSync } from 'fs';
 import os from 'os';
 import mongoose from 'mongoose';
-import authRoutes from './src/server/routes/auth.js';
+import authRoutes, { checkExpiry } from './src/server/routes/auth.js';
 import adminRoutes from './src/server/routes/admin.js';
 import supportRoutes from './src/server/routes/support.js';
 import jwt from 'jsonwebtoken';
@@ -1262,6 +1262,9 @@ app.post('/api/build-apk', async (req, res) => {
     const userId = decoded ? (decoded.id || decoded._id || decoded.sub) : null;
     console.log('[API] /build-apk extracted userId:', userId);
     let user = userId ? await User.findById(userId).catch(() => null) : null;
+    if (user) {
+      user = await checkExpiry(user);
+    }
     
     const finalUserId = user ? user._id : userId;
     console.log('[API] /build-apk Build will be assigned to user ID:', finalUserId);

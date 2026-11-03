@@ -15,11 +15,12 @@ export const checkExpiry = async (user: any) => {
   // Premium expiry check
   if (user.plan_expiry_date && now > new Date(user.plan_expiry_date)) {
     user.plan_type = 'Free';
-    user.credits_remaining = 3; // Give 3 credits back when reverting to Free
+    user.credits_remaining = 5; // Give 5 credits back when reverting to Free
     user.history_limit = 10;
     user.watermark_enabled = true;
     user.plan_expiry_date = undefined;
     user.last_credit_refill = now;
+    user.credit_system_version = 2;
     isModified = true;
   }
 
@@ -34,11 +35,24 @@ export const checkExpiry = async (user: any) => {
       nextRefillDate.setDate(nextRefillDate.getDate() + 14);
       
       if (now >= nextRefillDate) {
-        user.credits_remaining = 3;
+        user.credits_remaining = 5;
         user.last_credit_refill = now;
+        user.credit_system_version = 2;
         isModified = true;
       }
     }
+
+    // Auto-migrate existing 3-credit Free users to 5-credit quota
+    if (user.credit_system_version !== 2 && user.role !== 'admin') {
+      if (user.credits_remaining > 0) {
+        // Add 2 credits to match the 5-credit quota (e.g. 3 -> 5, 2 -> 4, 1 -> 3)
+        user.credits_remaining = Math.min(5, user.credits_remaining + 2);
+      }
+      // If user had 0 credits (e.g. 3*0 exhausted), keep at 0 credits until 14-day renewal
+      user.credit_system_version = 2;
+      isModified = true;
+    }
+
     if (!user.watermark_enabled) {
       user.watermark_enabled = true;
       isModified = true;
@@ -165,9 +179,10 @@ router.post('/verify-signup-otp', async (req: any, res: any) => {
       fullName: otpRecord.tempData?.fullName || 'APKify User',
       email: otpRecord.email,
       password: otpRecord.tempData?.password,
-      credits_remaining: 3,
+      credits_remaining: 5,
       history_limit: 10,
       plan_type: 'Free',
+      credit_system_version: 2,
       watermark_enabled: true
     });
     await newUser.save();

@@ -16,7 +16,7 @@ export default function Pricing({ onSelect }: PlanProps) {
       inr: '₹0',
       description: 'Free Forever',
       features: [
-        '3 APK Build Credits',
+        '5 APK Build Credits',
         '10 History Slots',
         'Watermark Enabled',
         '14 Days Renewal'

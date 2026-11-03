@@ -11,6 +11,7 @@ export interface IUser extends Document {
   signup_date: Date;
   plan_expiry_date?: Date;
   last_credit_refill: Date;
+  credit_system_version?: number;
   watermark_enabled: boolean;
   status: 'active' | 'suspended' | 'banned';
   suspended_until?: Date | null;
@@ -42,7 +43,7 @@ const userSchema = new mongoose.Schema<IUser>({
   },
   credits_remaining: {
     type: Number,
-    default: 3
+    default: 5
   },
   history_limit: {
     type: Number,
@@ -62,6 +63,10 @@ const userSchema = new mongoose.Schema<IUser>({
   last_credit_refill: {
     type: Date,
     default: Date.now
+  },
+  credit_system_version: {
+    type: Number,
+    default: 2
   },
   watermark_enabled: {
     type: Boolean,

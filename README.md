@@ -33,7 +33,7 @@ It completely removes the requirement for users to install Android Studio, confi
 * Prevents corrupted uploads from entering the queue or freezing build progress indicators.
 
 ### 3. 🎁 Smart Freemium Quota & 14-Day Auto-Refill
-* Free tier accounts receive **3 APK build credits** upon signup.
+* Free tier accounts receive **5 APK build credits** upon signup.
 * Automated **14-Day Renewal Lifecycle** automatically resets user credits every 14 days without requiring manual support tickets.
 
 ### 4. 🗄️ 7-Day Admin Safety Vault & Recovery System
