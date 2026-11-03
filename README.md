@@ -32,9 +32,10 @@ It completely removes the requirement for users to install Android Studio, confi
 * Blocks unsupported frameworks (**Flutter**, **React Native**, **Native Android Studio Java/Kotlin**, and **Backend Python/Node/PHP** projects) with instant English alerts.
 * Prevents corrupted uploads from entering the queue or freezing build progress indicators.
 
-### 3. 🎁 Smart Freemium Quota & 14-Day Auto-Refill
-* Free tier accounts receive **5 APK build credits** upon signup.
-* Automated **14-Day Renewal Lifecycle** automatically resets user credits every 14 days without requiring manual support tickets.
+### 3. 🎁 100% Free Developer Plan (3 Daily Builds & Zero Watermark)
+* Every developer account receives **3 APK build credits every day**.
+* Automated **Daily Midnight Refill** resets credits every night at 00:00 without requiring support tickets.
+* **100% Watermark-Free & Zero In-App Ads**: Native binaries are clean and ready for direct installation or distribution.
 
 ### 4. 🗄️ 7-Day Admin Safety Vault & Recovery System
 * **Soft Delete:** When a user removes an APK from their dashboard history, it is immediately hidden from their view.

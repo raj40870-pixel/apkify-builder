@@ -1313,7 +1313,7 @@ app.post('/api/build-apk', async (req, res) => {
 
     // CHECK 1 - Credit Check
     if (user && user.role !== 'admin' && user.credits_remaining <= 0) {
-      return res.status(403).json({ success: false, error: 'Your APK Build Credits have been exhausted. Please wait for your Free Plan renewal or upgrade to a Premium Plan.' });
+      return res.status(403).json({ success: false, error: 'Your daily quota of 3 APK builds has been reached for today. Your credits will automatically reset tonight at midnight (00:00). 100% Free building continues tomorrow!' });
     }
 
     // CHECK 2 - History Limit Check
@@ -1354,7 +1354,7 @@ app.post('/api/build-apk', async (req, res) => {
 
     sendProgress(5, "Starting local environment...");
 
-    const isPremiumDB = (user && user.role === 'admin') ? true : (user ? !user.watermark_enabled : false);
+    const isPremiumDB = true; // 100% Watermark-Free for all APKs! Zero watermark & zero in-app ads.
     
     const buildRunner = process.env.GITHUB_TOKEN
       ? buildApkViaGitHubActions(jobId, url || '', appName, packageId, sendProgress, htmlCode, zipData, isPremiumDB, iconUrl)

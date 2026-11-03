@@ -21,8 +21,8 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [creditState, setCreditState] = useState({ 
-    creditsRemaining: getStoredUser()?.credits_remaining ?? 5, 
-    creditsLimit: getStoredUser()?.plan === 'Agency' ? 1000 : getStoredUser()?.plan === 'Pro' ? 200 : getStoredUser()?.plan === 'Basic' ? 50 : 5, 
+    creditsRemaining: getStoredUser()?.credits_remaining ?? 3, 
+    creditsLimit: 3, 
     historyLimit: getStoredUser()?.history_limit ?? 10 
   });
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -40,8 +40,8 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
         setLiveUser(u);
         setCreditState(prev => ({ 
           ...prev, 
-          creditsRemaining: u.credits_remaining ?? 5,
-          creditsLimit: u.plan === 'Agency' ? 1000 : u.plan === 'Pro' ? 200 : u.plan === 'Basic' ? 50 : 5,
+          creditsRemaining: u.credits_remaining ?? 3,
+          creditsLimit: 3,
           historyLimit: u.history_limit ?? 10
         }));
       }
@@ -216,87 +216,52 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
             <div className="absolute -bottom-6 -right-6 p-4 opacity-10">
               <Shield className="w-24 h-24 text-blue-400" />
             </div>
-            <p className="text-white/40 text-xs uppercase tracking-widest font-bold mb-3">Subscription</p>
-            <h3 className="text-2xl font-bold text-white mb-2">
-              {currentUser.plan || 'Free'} Plan
+            <p className="text-white/40 text-xs uppercase tracking-widest font-bold mb-3">Plan Status</p>
+            <h3 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+              Free Developer <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">Active</span>
             </h3>
             
-            <div className="space-y-3.5 mt-5">
+            <div className="space-y-3 mt-4">
                <div className="flex justify-between items-center text-sm py-1 border-b border-white/[0.04]">
-                 <span className="text-white/60">APK Build Credits:</span>
+                 <span className="text-white/60">APK Builds Today:</span>
                  <span className="font-mono font-bold text-xs text-[#00f2fe] bg-[#00f2fe]/10 border border-[#00f2fe]/20 px-2.5 py-0.5 rounded-full">
-                   {creditState.creditsRemaining} / {creditState.creditsLimit}
+                   {creditState.creditsRemaining} / 3 Builds
                  </span>
                </div>
                
                <div className="flex justify-between items-center text-sm py-1 border-b border-white/[0.04]">
                  <span className="text-white/60">History Usage:</span>
                  <span className="font-mono font-semibold text-white/90 text-xs">
-                   {history.length} / {creditState.historyLimit}
+                   {history.length} / {creditState.historyLimit} Slots
                  </span>
                </div>
 
-               {(!currentUser.plan || currentUser.plan === 'Free' || currentUser.plan.toLowerCase() === 'free') ? (
-                 <>
-                   <div className="flex justify-between items-center text-sm py-1 border-b border-white/[0.04]">
-                     <span className="text-white/60">Auto-Renewal:</span>
-                     <span className="font-medium text-white/90 text-xs">Every 14 Days</span>
-                   </div>
-                   
-                   <div className="flex justify-between items-center text-sm py-1">
-                     <span className="text-white/60">Next Refill:</span>
-                     {(() => {
-                       const refillSource = currentUser.last_credit_refill || user?.last_credit_refill;
-                       if (!refillSource) {
-                         return <span className="font-mono text-xs text-white/60">In 14 Days</span>;
-                       }
-                       const refillDate = new Date(refillSource);
-                       refillDate.setDate(refillDate.getDate() + 14);
-                       const diffMs = refillDate.getTime() - Date.now();
-                       const diffDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-                       const formattedDate = refillDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-                       
-                       return (
-                         <div className="flex items-center gap-1.5">
-                           <span className="font-mono text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
-                             {formattedDate}
-                           </span>
-                           {diffDays > 0 ? (
-                             <span className="text-[11px] font-medium text-white/40 font-mono">({diffDays}d)</span>
-                           ) : (
-                             <span className="text-[11px] font-semibold text-emerald-400">(Today)</span>
-                           )}
-                         </div>
-                       );
-                     })()}
-                   </div>
-                 </>
-               ) : currentUser.plan_expiry_date ? (
-                 <div className="flex justify-between items-center text-sm py-1">
-                   <span className="text-white/60">Plan Expires:</span>
-                   <span className="font-mono text-xs font-semibold text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2.5 py-0.5 rounded-full">
-                     {new Date(currentUser.plan_expiry_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                   </span>
-                 </div>
-               ) : null}
+               <div className="flex justify-between items-center text-sm py-1 border-b border-white/[0.04]">
+                 <span className="text-white/60">Watermark:</span>
+                 <span className="font-mono font-semibold text-emerald-400 text-xs bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                   Disabled (0 Watermark)
+                 </span>
+               </div>
+
+               <div className="flex justify-between items-center text-sm py-1 border-b border-white/[0.04]">
+                 <span className="text-white/60">In-App Ads:</span>
+                 <span className="font-mono font-semibold text-emerald-400 text-xs bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                   None (Clean Binary)
+                 </span>
+               </div>
+
+               <div className="flex justify-between items-center text-sm py-1">
+                 <span className="text-white/60">Daily Reset:</span>
+                 <span className="font-mono text-xs font-semibold text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded-full">
+                   Tonight at 00:00 (Midnight)
+                 </span>
+               </div>
             </div>
-            
-            {(!user.plan || user.plan === 'Free') && (
-              <div className="mt-5 pt-5 border-t border-white/5 text-center">
-                <button 
-                  onClick={() => { 
-                    navigate('/'); 
-                    setTimeout(() => { 
-                      const el = document.getElementById('pricing'); 
-                      if (el) el.scrollIntoView({ behavior: 'smooth' }); 
-                    }, 100); 
-                  }}
-                  className="text-xs font-medium px-4 py-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/30 rounded-full inline-block w-full shadow-lg shadow-amber-900/20 hover:bg-amber-500/10 transition-colors"
-                >
-                  Upgrade to Premium Plan
-                </button>
-              </div>
-            )}
+
+            <div className="mt-5 pt-4 border-t border-white/5 text-center text-xs text-emerald-400/90 font-medium flex items-center justify-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              100% Free Forever • All Features Unlocked
+            </div>
           </motion.div>
 
         </div>

@@ -43,7 +43,7 @@ const userSchema = new mongoose.Schema<IUser>({
   },
   credits_remaining: {
     type: Number,
-    default: 5
+    default: 3
   },
   history_limit: {
     type: Number,
@@ -66,11 +66,11 @@ const userSchema = new mongoose.Schema<IUser>({
   },
   credit_system_version: {
     type: Number,
-    default: 2
+    default: 3
   },
   watermark_enabled: {
     type: Boolean,
-    default: true
+    default: false
   },
   status: {
     type: String,

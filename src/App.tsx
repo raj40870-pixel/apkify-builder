@@ -97,10 +97,10 @@ export default function App() {
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route 
-              path="/payment" 
+              path="/payment"
               element={
                 <ProtectedRoute>
-                  <PaymentPage />
+                  <Navigate to="/build" replace />
                 </ProtectedRoute>
               } 
             />

@@ -44,16 +44,17 @@ export default function TermsPage() {
         <section>
           <div className="flex items-center gap-3 mb-4">
             <FileText className="w-6 h-6 text-purple-500" />
-            <h2 className="text-2xl font-bold m-0">2. Free Credit System & 14-Day Auto Refill</h2>
+            <h2 className="text-2xl font-bold m-0">2. Free Developer Quota & Daily Auto-Refill</h2>
           </div>
           <p className="text-white/80 leading-relaxed">
-            Upon successful registration and OTP confirmation, Free Tier users receive 5 APK build credits:
+            Every registered developer receives 3 APK build credits every single day:
           </p>
           <ul className="text-white/80 space-y-2 mt-4 ml-6 list-disc">
-            <li><strong>Automated 14-Day Refill:</strong> Free credits automatically refill back to 5 credits every 14 days from your last refill date. No manual ticket or admin intervention is required.</li>
-            <li><strong>Non-Cumulative Quota:</strong> Unused credits do not roll over across refill cycles. The balance resets to a cap of 5.</li>
-            <li><strong>Immediate Deduction:</strong> Credits are deducted when a build job is dispatched. If a build crashes due to system error, credits are automatically refunded to your balance.</li>
-            <li><strong>Watermark Notice:</strong> All APKs generated on the Free Plan contain an unobtrusive APKify Builder launch badge to promote platform transparency.</li>
+            <li><strong>Daily Midnight Refill:</strong> Free credits automatically refill back to 3 credits every night at 00:00 (Midnight). No manual intervention is needed.</li>
+            <li><strong>Non-Cumulative Quota:</strong> Unused credits do not stack. The balance resets to a daily cap of 3.</li>
+            <li><strong>Immediate Deduction & Auto-Refund:</strong> Credits are deducted upon build dispatch. If a build fails due to server issue, credits are automatically refunded.</li>
+            <li><strong>100% Watermark-Free:</strong> All APKs generated on APKify Builder are completely free of platform watermarks, badges, or brand overlays.</li>
+            <li><strong>Zero In-App Ads:</strong> We never inject any third-party advertisements or SDKs into your compiled Android APK binaries.</li>
           </ul>
         </section>
 
@@ -61,18 +62,17 @@ export default function TermsPage() {
         <section>
           <div className="flex items-center gap-3 mb-4">
             <Lock className="w-6 h-6 text-emerald-500" />
-            <h2 className="text-2xl font-bold m-0">3. Premium Plans & Commercial Terms</h2>
+            <h2 className="text-2xl font-bold m-0">3. 100% Free Forever Platform Guarantee</h2>
           </div>
           <p className="text-white/80 leading-relaxed">
-            Upgraded plans (Pro, Business, Enterprise) provide professional developer capabilities with 100% watermark removal and custom branding:
+            APKify Builder operates as an open, community-first tool for web developers, designers, and students:
           </p>
           <ul className="text-white/80 space-y-2 mt-4 ml-6 list-disc">
-            <li><strong>Permanent Watermark Removal:</strong> Your custom icons, splash screens, and package identities remain strictly your own.</li>
-            <li><strong>Fixed Plan Quota:</strong> Premium plan credits are granted in full upon purchase and do not automatically refill. Additional packs may be purchased as needed.</li>
-            <li><strong>Cloud Storage:</strong> Build history is retained in your private cloud dashboard for quick re-downloads according to tier limits.</li>
+            <li><strong>No Hidden Subscriptions:</strong> There are no credit cards, hidden paywalls, or commercial locks required to export your apps.</li>
+            <li><strong>Full Ownership:</strong> You retain 100% intellectual property ownership of your HTML/JS code, logos, assets, and exported binaries.</li>
+            <li><strong>Cloud History Storage:</strong> Completed builds are retained securely in your private cloud dashboard for convenient re-downloads.</li>
           </ul>
         </section>
-
         {/* SECTION 4 */}
         <section>
           <div className="flex items-center gap-3 mb-4">

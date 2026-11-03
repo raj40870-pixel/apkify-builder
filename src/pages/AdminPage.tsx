@@ -524,7 +524,7 @@ export default function AdminPage() {
                       </td>
                       <td className="py-4 px-6">
                         <span className="font-mono text-sm font-bold text-[#00f2fe]">
-                          {u.role === 'admin' ? '∞ Unlimited' : `${u.credits_remaining} / ${u.plan_type === 'Free' ? 5 : 50}`}
+                          {u.role === 'admin' ? '∞ Unlimited' : `${u.credits_remaining} / 3 (Daily)`}
                         </span>
                       </td>
                       <td className="py-4 px-6">

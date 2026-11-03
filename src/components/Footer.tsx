@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  ShieldCheck, HelpCircle, Wrench, CreditCard, Info, Github
+  ShieldCheck, HelpCircle, Wrench, CreditCard, Info, Github, Zap
 } from 'lucide-react';
 import SupportModal from './SupportModal';
 
@@ -43,9 +43,9 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/payment" className="hover:text-blue-400 transition-colors flex items-center gap-1.5">
-                  <CreditCard className="w-3.5 h-3.5 text-blue-400" /> Plans & Pricing
-                </Link>
+                <a href="/#pricing" className="hover:text-blue-400 transition-colors flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-blue-400" /> Free Plan & Features
+                </a>
               </li>
             </ul>
           </div>

@@ -18,20 +18,11 @@ export default function LandingPage() {
     }
   };
 
-  const handleSelectPlan = (plan: string) => {
+  const handleSelectPlan = () => {
     if (user) {
-      if (plan === 'Free') {
-        navigate('/build');
-      } else {
-        navigate('/payment', { state: { plan } });
-      }
+      navigate('/build');
     } else {
-      navigate('/login', { 
-        state: { 
-          from: { pathname: plan === 'Free' ? '/build' : '/payment' },
-          message: `Login required to purchase ${plan} plan` 
-        } 
-      });
+      navigate('/signup');
     }
   };
 

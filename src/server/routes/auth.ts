@@ -12,49 +12,44 @@ export const checkExpiry = async (user: any) => {
   let isModified = false;
   const now = new Date();
 
-  // Premium expiry check
-  if (user.plan_expiry_date && now > new Date(user.plan_expiry_date)) {
+  // 1. Force Free Developer plan & disable watermark completely
+  if (user.plan_type !== 'Free' && user.role !== 'admin') {
     user.plan_type = 'Free';
-    user.credits_remaining = 5; // Give 5 credits back when reverting to Free
-    user.history_limit = 10;
-    user.watermark_enabled = true;
+    isModified = true;
+  }
+  if (user.watermark_enabled !== false) {
+    user.watermark_enabled = false;
+    isModified = true;
+  }
+  if (user.plan_expiry_date) {
     user.plan_expiry_date = undefined;
-    user.last_credit_refill = now;
-    user.credit_system_version = 2;
     isModified = true;
   }
 
-  // Free plan 14-day renewal check
-  if (user.plan_type === 'Free' || user.plan_type === 'free' || !user.plan_type) {
+  // 2. Daily Quota Refill: 3 APK Builds per day (Resets at midnight or after 24 hours)
+  if (user.role !== 'admin') {
     if (!user.last_credit_refill) {
+      user.credits_remaining = 3;
       user.last_credit_refill = now;
+      user.credit_system_version = 3;
       isModified = true;
     } else {
       const lastRefill = new Date(user.last_credit_refill);
-      const nextRefillDate = new Date(lastRefill);
-      nextRefillDate.setDate(nextRefillDate.getDate() + 14);
-      
-      if (now >= nextRefillDate) {
-        user.credits_remaining = 5;
+      const isNewCalendarDay = now.toDateString() !== lastRefill.toDateString();
+      const is24HoursPassed = (now.getTime() - lastRefill.getTime()) >= 24 * 60 * 60 * 1000;
+
+      if (isNewCalendarDay || is24HoursPassed) {
+        user.credits_remaining = 3;
         user.last_credit_refill = now;
-        user.credit_system_version = 2;
+        user.credit_system_version = 3;
         isModified = true;
       }
     }
 
-    // Auto-migrate existing 3-credit Free users to 5-credit quota
-    if (user.credit_system_version !== 2 && user.role !== 'admin') {
-      if (user.credits_remaining > 0) {
-        // Add 2 credits to match the 5-credit quota (e.g. 3 -> 5, 2 -> 4, 1 -> 3)
-        user.credits_remaining = Math.min(5, user.credits_remaining + 2);
-      }
-      // If user had 0 credits (e.g. 3*0 exhausted), keep at 0 credits until 14-day renewal
-      user.credit_system_version = 2;
-      isModified = true;
-    }
-
-    if (!user.watermark_enabled) {
-      user.watermark_enabled = true;
+    // Migration to version 3 (3 builds daily quota)
+    if (user.credit_system_version !== 3) {
+      user.credits_remaining = Math.min(3, user.credits_remaining ?? 3);
+      user.credit_system_version = 3;
       isModified = true;
     }
   }
@@ -179,11 +174,11 @@ router.post('/verify-signup-otp', async (req: any, res: any) => {
       fullName: otpRecord.tempData?.fullName || 'APKify User',
       email: otpRecord.email,
       password: otpRecord.tempData?.password,
-      credits_remaining: 5,
+      credits_remaining: 3,
       history_limit: 10,
       plan_type: 'Free',
-      credit_system_version: 2,
-      watermark_enabled: true
+      credit_system_version: 3,
+      watermark_enabled: false
     });
     await newUser.save();
 
@@ -590,26 +585,18 @@ router.post('/upgrade', async (req: any, res: any) => {
     const user = await User.findById(decoded.id);
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-    user.plan_type = 'Pro';
-    user.credits_remaining = 50;
-    user.history_limit = 50;
-    user.watermark_enabled = false;
-    user.plan_expiry_date = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    user.last_credit_refill = new Date();
-    await user.save();
-
+    // Platform is 100% Free - no paid upgrade needed
     return res.status(200).json({
       success: true,
-      message: 'Plan upgraded successfully',
+      message: 'APKify Builder is 100% Free Forever for all developers! All features (No Watermark, Clean APK, Daily 3 Builds) are unlocked on your account.',
       user: {
         id: user._id,
         name: user.fullName,
         email: user.email,
         credits_remaining: user.credits_remaining,
-        history_limit: user.history_limit,
-        plan: user.plan_type,
-        watermark_enabled: user.watermark_enabled,
-        plan_expiry_date: user.plan_expiry_date
+        history_limit: 10,
+        plan: 'Free',
+        watermark_enabled: false
       }
     });
   } catch (error: any) {
