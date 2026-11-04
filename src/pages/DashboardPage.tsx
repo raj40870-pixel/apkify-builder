@@ -70,7 +70,7 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
         id: h._id,
         app_name: h.apk_name || 'Untitled App',
         app_version: '1.0.0',
-        created_at: h.created_at || new Date().toISOString(),
+        created_at: h.created_at || h.createdAt || new Date().toISOString(),
         status: h.status === 'Success' ? 'Completed' : (h.status || 'Completed'),
         progress: 100,
         downloadUrl: h.downloadUrl,
@@ -418,16 +418,29 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
                          {build.status} {build.status === 'Building' ? `(${build.progress || 0}%)` : ''}
                        </span>
                        {build.status === 'Completed' && (() => {
-                         const createdTime = new Date(build.created_at).getTime();
-                         const daysPassed = (Date.now() - createdTime) / (1000 * 60 * 60 * 24);
-                         const daysLeft = Math.max(1, Math.ceil(30 - daysPassed));
-                         return (
-                           <span className="text-[11px] font-medium text-amber-300/80 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm" title="Stored in active backup for 30 days">
-                             <Clock className="w-3 h-3 text-amber-400" />
-                             {daysLeft}d left
-                           </span>
-                         );
-                       })()}
+                          const createdDate = new Date(build.created_at);
+                          const now = new Date();
+                          const createdMidnight = new Date(createdDate.getFullYear(), createdDate.getMonth(), createdDate.getDate()).getTime();
+                          const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                          const calendarDaysPassed = Math.max(0, Math.floor((todayMidnight - createdMidnight) / (1000 * 60 * 60 * 24)));
+                          const daysLeft = Math.max(0, 30 - calendarDaysPassed);
+
+                          if (daysLeft === 0) {
+                            return (
+                              <span className="text-[11px] font-medium text-red-400 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm" title="30-day retention expired">
+                                <Clock className="w-3 h-3 text-red-400" />
+                                Expired
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <span className="text-[11px] font-medium text-amber-300/80 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm" title={`30-day active retention: ${daysLeft} days remaining before auto-purge`}>
+                              <Clock className="w-3 h-3 text-amber-400" />
+                              {daysLeft}d left
+                            </span>
+                          );
+                        })()}
                        <button
                          onClick={() => handleOpenDeleteModal([build.id], build.app_name)}
                          className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition-colors ml-1"

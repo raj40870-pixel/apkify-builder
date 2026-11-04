@@ -1431,6 +1431,7 @@ app.post('/api/build-apk', async (req, res) => {
             status: 'Completed',
             downloadUrl: finalDownloadUrl,
             active_expires_at: activeExpiry,
+            created_at: new Date(),
             storage_folder: 'apks',
             user_deleted: false
           }).catch((err) => console.error('[API] Failed to save build history:', err));
