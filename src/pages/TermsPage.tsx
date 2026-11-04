@@ -62,7 +62,7 @@ export default function TermsPage() {
         <section>
           <div className="flex items-center gap-3 mb-4">
             <Lock className="w-6 h-6 text-emerald-500" />
-            <h2 className="text-2xl font-bold m-0">3. 100% Free Forever Platform Guarantee</h2>
+            <h2 className="text-2xl font-bold m-0">3. Free Community Tier & Platform Usage</h2>
           </div>
           <p className="text-white/80 leading-relaxed">
             APKify Builder operates as an open, community-first tool for web developers, designers, and students:

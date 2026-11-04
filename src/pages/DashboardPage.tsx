@@ -296,7 +296,7 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
               ) : (
                 <>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="text-emerald-400/90">100% Free Forever • Daily Reset</span>
+                  <span className="text-emerald-400/90">100% Free Plan • Daily Reset</span>
                 </>
               )}
             </div>

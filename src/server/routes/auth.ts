@@ -588,7 +588,7 @@ router.post('/upgrade', async (req: any, res: any) => {
     // Platform is 100% Free - no paid upgrade needed
     return res.status(200).json({
       success: true,
-      message: 'APKify Builder is 100% Free Forever for all developers! All features (No Watermark, Clean APK, Daily 3 Builds) are unlocked on your account.',
+      message: 'APKify Builder provides 100% Free access for all developers! All features (No Watermark, Clean APK, Daily 3 Builds) are active on your account.',
       user: {
         id: user._id,
         name: user.fullName,
