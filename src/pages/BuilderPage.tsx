@@ -13,7 +13,7 @@ export default function BuilderPage() {
   const navigate = useNavigate();
   const [appName, setAppName] = useState('');
   const [appVersion, setAppVersion] = useState('1.0.0');
-  const [packageId, setPackageId] = useState('com.stellar.app');
+  const [packageId, setPackageId] = useState('');
   const [url, setUrl] = useState('');
   const [htmlCode, setHtmlCode] = useState('');
   const [activeTab, setActiveTab] = useState<'zip' | 'url' | 'html'>('url');
@@ -202,7 +202,7 @@ export default function BuilderPage() {
       return;
     }
     if (!packageId.trim()) {
-      alert('Please enter a Package ID');
+      alert('Please enter your Package ID (e.g. com.mycompany.app)');
       return;
     }
 
@@ -591,13 +591,19 @@ export default function BuilderPage() {
                   />
                 </div>
                 <div className="space-y-3">
-                  <Label className="text-white/60 ml-1 font-medium">Package ID</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-white/60 ml-1 font-medium">Package ID</Label>
+                    <span className="text-[11px] text-white/40">Custom (e.g. com.mybrand.app)</span>
+                  </div>
                   <Input 
                     value={packageId}
                     onChange={(e) => setPackageId(e.target.value)}
-                    placeholder="e.g. com.mycompany.app" 
+                    placeholder="Enter your package name (e.g. com.mycompany.app)" 
                     className="h-14 bg-white/5 border-white/10 rounded-2xl focus:ring-purple-500/50 transition-all text-lg px-6"
                   />
+                  <p className="text-xs text-white/40 ml-1">
+                    Enter your custom unique Android Package ID to avoid Play Store conflicts.
+                  </p>
                 </div>
                 <div className="space-y-3">
                   <Label className="text-white/60 ml-1 font-medium">App Version</Label>
