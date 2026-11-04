@@ -2,6 +2,9 @@ export interface User {
   id: string;
   fullName: string;
   email: string;
+  role?: string;
+  credits_remaining?: number;
+  history_limit?: number;
   buildsUsed?: number;
   totalBuilds?: number;
   trialDaysLeft?: number;

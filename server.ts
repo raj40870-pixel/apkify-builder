@@ -1435,7 +1435,7 @@ app.post('/api/build-apk', async (req, res) => {
             user_deleted: false
           }).catch((err) => console.error('[API] Failed to save build history:', err));
           
-          if (user) {
+          if (user && user.role !== 'admin') {
             user.credits_remaining = Math.max(0, user.credits_remaining - 1);
             await user.save();
           }

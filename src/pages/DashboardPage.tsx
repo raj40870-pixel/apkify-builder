@@ -32,6 +32,23 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
   const [targetBuildName, setTargetBuildName] = useState<string>('');
   const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.email === 'kamaljit444501@gmail.com';
+  const [resetCountdown, setResetCountdown] = useState<string>('In 24h 00m');
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      const diffMs = midnight.getTime() - now.getTime();
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      setResetCountdown(`In ${hours}h ${minutes}m (00:00)`);
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     // Fetch live user state on load
@@ -213,57 +230,77 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
             transition={{ delay: 0.1 }}
             className="glass border border-white/10 rounded-3xl p-6 relative overflow-hidden bg-gradient-to-br from-white/[0.03] to-white/[0.01]"
           >
-            <div className="absolute -bottom-6 -right-6 p-4 opacity-10">
+            <div className="absolute -bottom-6 -right-6 p-4 opacity-5 pointer-events-none">
               <Shield className="w-24 h-24 text-blue-400" />
             </div>
             <p className="text-white/40 text-xs uppercase tracking-widest font-bold mb-3">Plan Status</p>
             <h3 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-              Free Developer <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">Active</span>
+              {isAdmin ? (
+                <>
+                  Administrator <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-semibold border border-purple-500/30">Super Admin</span>
+                </>
+              ) : (
+                <>
+                  Free Developer <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">Active</span>
+                </>
+              )}
             </h3>
             
-            <div className="space-y-3 mt-4">
-               <div className="flex justify-between items-center text-sm py-1 border-b border-white/[0.04]">
+            <div className="space-y-3.5 mt-5">
+               <div className="flex justify-between items-center text-sm py-1.5 border-b border-white/[0.04]">
                  <span className="text-white/60">APK Builds Today:</span>
-                 <span className="font-mono font-bold text-xs text-[#00f2fe] bg-[#00f2fe]/10 border border-[#00f2fe]/20 px-2.5 py-0.5 rounded-full">
-                   {creditState.creditsRemaining} / 3 Builds
-                 </span>
+                 {isAdmin ? (
+                   <span className="font-mono font-bold text-xs text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
+                     ∞ Unlimited
+                   </span>
+                 ) : (
+                   <span className="font-mono font-bold text-xs text-[#00f2fe] bg-[#00f2fe]/10 border border-[#00f2fe]/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
+                     {creditState.creditsRemaining} / 3 Builds
+                   </span>
+                 )}
                </div>
                
-               <div className="flex justify-between items-center text-sm py-1 border-b border-white/[0.04]">
-                 <span className="text-white/60">History Usage:</span>
+               <div className="flex justify-between items-center text-sm py-1.5 border-b border-white/[0.04]">
+                 <span className="text-white/60">History Slots:</span>
                  <span className="font-mono font-semibold text-white/90 text-xs">
-                   {history.length} / {creditState.historyLimit} Slots
+                   {isAdmin ? (
+                     <span className="text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
+                       ∞ Unlimited
+                     </span>
+                   ) : (
+                     `${history.length} / ${creditState.historyLimit} Slots`
+                   )}
                  </span>
                </div>
 
-               <div className="flex justify-between items-center text-sm py-1 border-b border-white/[0.04]">
-                 <span className="text-white/60">Watermark:</span>
-                 <span className="font-mono font-semibold text-emerald-400 text-xs bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
-                   Disabled (0 Watermark)
-                 </span>
-               </div>
-
-               <div className="flex justify-between items-center text-sm py-1 border-b border-white/[0.04]">
-                 <span className="text-white/60">In-App Ads:</span>
-                 <span className="font-mono font-semibold text-emerald-400 text-xs bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
-                   None (Clean Binary)
-                 </span>
-               </div>
-
-               <div className="flex justify-between items-center text-sm py-1">
+               <div className="flex justify-between items-center text-sm py-1.5">
                  <span className="text-white/60">Daily Reset:</span>
-                 <span className="font-mono text-xs font-semibold text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded-full">
-                   Tonight at 00:00 (Midnight)
-                 </span>
+                 {isAdmin ? (
+                   <span className="font-mono text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
+                     No Daily Limits
+                   </span>
+                 ) : (
+                   <span className="font-mono text-xs font-semibold text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
+                     {resetCountdown}
+                   </span>
+                 )}
                </div>
             </div>
 
-            <div className="mt-5 pt-4 border-t border-white/5 text-center text-xs text-emerald-400/90 font-medium flex items-center justify-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              100% Free Forever • All Features Unlocked
+            <div className="mt-5 pt-4 border-t border-white/5 text-center text-xs font-medium flex items-center justify-center gap-1.5 relative z-10">
+              {isAdmin ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
+                  <span className="text-purple-300/90">Administrative Access • Zero Restrictions</span>
+                </>
+              ) : (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="text-emerald-400/90">100% Free Forever • Daily Reset</span>
+                </>
+              )}
             </div>
           </motion.div>
-
         </div>
 
         {/* Right Column: Build History */}
