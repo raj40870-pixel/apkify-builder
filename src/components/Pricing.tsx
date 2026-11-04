@@ -30,7 +30,7 @@ export default function Pricing({ onSelect }: PlanProps) {
           Free Developer Plan
         </h2>
         <p className="text-white/60 text-base md:text-lg max-w-2xl mx-auto">
-          No subscriptions, no credit cards, and no hidden fees. Build high-quality native Android APKs every single day for free.
+          Build high-quality native Android APKs every single day for free.
         </p>
       </div>
 
