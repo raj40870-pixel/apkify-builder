@@ -241,7 +241,7 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
                 </>
               ) : (
                 <>
-                  Starter Plan <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-semibold border border-blue-500/30">Active</span>
+                  Free Plan <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">Active</span>
                 </>
               )}
             </h3>
@@ -295,8 +295,8 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
                 </>
               ) : (
                 <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
-                  <span className="text-blue-400/90">Starter Plan • Daily Reset at 00:00</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="text-emerald-400/90">Free Plan • Daily Reset at 00:00</span>
                 </>
               )}
             </div>

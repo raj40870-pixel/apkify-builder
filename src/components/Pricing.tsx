@@ -11,23 +11,23 @@ interface PlanProps {
 export default function Pricing({ onSelect }: PlanProps) {
   const features = [
     { text: '3 APK Builds Every Day (Daily Reset at 00:00 Midnight)', highlight: true },
-    { text: '100% No Watermark (Clean App, Pure Custom Branding)', highlight: true },
+    { text: '100% No Watermark (Clean App)', highlight: true },
     { text: 'Zero In-App Ads (No ads injected into your APK binary)', highlight: true },
     { text: 'Direct APK Download & Instant QR Code Scanner', highlight: false },
     { text: '10 Cloud History Slots for Fast Re-Downloads', highlight: false },
     { text: 'Custom App Name & Unique Package ID (com.domain.app)', highlight: false },
     { text: 'Custom App Icon & Splash Screen Support', highlight: false },
-    { text: 'Lightning Fast Cloud Build Pipeline (Under 90s)', highlight: false }
+    { text: 'Fast Cloud Build Pipeline (~2 to 3 Minutes)', highlight: false }
   ];
 
   return (
     <section id="pricing" className="py-24 container px-4 mx-auto">
       <div className="text-center mb-12">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-4">
-          <Sparkles className="w-3.5 h-3.5" /> Cloud Build Pipeline
+          <Sparkles className="w-3.5 h-3.5" /> Free Plan
         </div>
         <h2 className="text-3xl md:text-5xl font-display font-bold mb-4">
-          Starter Plan
+          Free Plan
         </h2>
         <p className="text-white/60 text-base md:text-lg max-w-2xl mx-auto">
           Build high-quality native Android APKs directly in the cloud.
@@ -49,7 +49,7 @@ export default function Pricing({ onSelect }: PlanProps) {
                     <Zap className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold font-display text-white">Starter</h3>
+                    <h3 className="text-2xl font-bold font-display text-white">Free Plan</h3>
                     <p className="text-xs text-white/50">Full Native APK Cloud Pipeline</p>
                   </div>
                 </div>
@@ -57,7 +57,7 @@ export default function Pricing({ onSelect }: PlanProps) {
 
               <div className="flex items-baseline gap-2">
                 <span className="text-5xl font-extrabold text-white font-display">$0</span>
-                <span className="text-white/50 font-semibold text-sm">/ month</span>
+                <span className="text-emerald-400 font-semibold text-sm">/ Free Plan</span>
               </div>
             </div>
 
@@ -76,8 +76,8 @@ export default function Pricing({ onSelect }: PlanProps) {
                         : 'bg-white/[0.02] border-white/5 text-white/80'
                     }`}
                   >
-                    <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                      <Check className="w-3.5 h-3.5 text-blue-400" />
+                    <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
                     </div>
                     <span className="text-sm leading-snug">
                       {feature.text}
