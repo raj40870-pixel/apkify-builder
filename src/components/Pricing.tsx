@@ -24,13 +24,13 @@ export default function Pricing({ onSelect }: PlanProps) {
     <section id="pricing" className="py-24 container px-4 mx-auto">
       <div className="text-center mb-12">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-4">
-          <Sparkles className="w-3.5 h-3.5" /> 100% Free Plan
+          <Sparkles className="w-3.5 h-3.5" /> Cloud Build Pipeline
         </div>
         <h2 className="text-3xl md:text-5xl font-display font-bold mb-4">
-          Free Developer Plan
+          Starter Plan
         </h2>
         <p className="text-white/60 text-base md:text-lg max-w-2xl mx-auto">
-          Build high-quality native Android APKs every single day for free.
+          Build high-quality native Android APKs directly in the cloud.
         </p>
       </div>
 
@@ -49,15 +49,15 @@ export default function Pricing({ onSelect }: PlanProps) {
                     <Zap className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold font-display text-white">Community Developer</h3>
-                    <p className="text-xs text-white/50">Full Native APK Builder • Free Plan</p>
+                    <h3 className="text-2xl font-bold font-display text-white">Starter</h3>
+                    <p className="text-xs text-white/50">Full Native APK Cloud Pipeline</p>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-baseline gap-2">
                 <span className="text-5xl font-extrabold text-white font-display">$0</span>
-                <span className="text-emerald-400 font-semibold text-sm">/ Free Plan</span>
+                <span className="text-white/50 font-semibold text-sm">/ month</span>
               </div>
             </div>
 
@@ -76,8 +76,8 @@ export default function Pricing({ onSelect }: PlanProps) {
                         : 'bg-white/[0.02] border-white/5 text-white/80'
                     }`}
                   >
-                    <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                      <Check className="w-3.5 h-3.5 text-blue-400" />
                     </div>
                     <span className="text-sm leading-snug">
                       {feature.text}
@@ -92,7 +92,7 @@ export default function Pricing({ onSelect }: PlanProps) {
                 onClick={() => onSelect('Free')}
                 className="w-full py-6 rounded-2xl font-display font-bold text-lg bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:opacity-95 shadow-xl shadow-blue-600/30 text-white transition-all transform active:scale-[0.99]"
               >
-                <Cpu className="w-5 h-5 mr-2" /> Start Building APK (100% Free)
+                <Cpu className="w-5 h-5 mr-2" /> Start Building APK
               </Button>
             </CardFooter>
           </Card>

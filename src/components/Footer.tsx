@@ -44,7 +44,7 @@ export default function Footer() {
               </li>
               <li>
                 <a href="/#pricing" className="hover:text-blue-400 transition-colors flex items-center gap-1.5">
-                  <Zap className="w-3.5 h-3.5 text-blue-400" /> Free Plan & Features
+                  <Zap className="w-3.5 h-3.5 text-blue-400" /> Plans & Features
                 </a>
               </li>
             </ul>
