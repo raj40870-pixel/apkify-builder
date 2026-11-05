@@ -482,7 +482,7 @@ async function buildApkViaGitHubActions(
         html_code: effectiveHtmlCode || '',
         zip_url: zipUrl || '',
         icon_url: iconUploadRelativePath || '',
-        is_premium: isPremium ? 'true' : 'false'
+        is_premium: 'true' // Always 100% watermark-free
       }
     })
   });
@@ -604,7 +604,7 @@ async function buildApkLocally(
     await sleep(1000);
     sendProgress(40, "Syncing assets and configurations...");
     await sleep(800);
-    sendProgress(45, "Injecting Splash Branding...");
+    sendProgress(45, "Finalizing app environment and configurations...");
     await sleep(500);
     
     if (iconUrl && iconUrl.trim()) {
@@ -923,103 +923,9 @@ async function buildApkLocally(
     await fs.mkdir(path.dirname(assetsConfigJson), { recursive: true }).catch(() => {});
     await fs.writeFile(assetsConfigJson, JSON.stringify(capConfigObj, null, 2));
 
-    if (!isPremium) {
-      sendProgress(45, "Injecting Splash Branding...");
-      const packagePath = packageId.replace(/\./g, '/');
-      const javaDir = path.join(tempDir, 'android', 'app', 'src', 'main', 'java', packagePath);
-      await fs.mkdir(javaDir, { recursive: true });
-
-      const splashActivityCode = `package ${packageId};
-
-import android.app.Activity;
-import android.content.Intent;
-import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.widget.ImageView;
-
-public class SplashActivity extends Activity {
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_splash);
-
-        final ImageView logo = findViewById(R.id.splash_logo);
-        if (logo != null) logo.setAlpha(0f);
-        if (logo != null) logo.animate().alpha(1f).setDuration(300).start();
-
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (logo != null) logo.animate().alpha(0f).setDuration(300).start();
-            }
-        }, 1200);
-
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                Intent intent = new Intent(SplashActivity.this, MainActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(intent);
-                overridePendingTransition(0, 0);
-                finish();
-            }
-        }, 1500);
-    }
-}
-`;
-      await fs.writeFile(path.join(javaDir, 'SplashActivity.java'), splashActivityCode);
-
-      const layoutDir = path.join(tempDir, 'android', 'app', 'src', 'main', 'res', 'layout');
-      await fs.mkdir(layoutDir, { recursive: true });
-      const splashLayoutXml = `<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:background="#FFFFFF">
-    <ImageView
-        android:id="@+id/splash_logo"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:src="@drawable/apkify_logo" />
-</LinearLayout>
-`;
-      await fs.writeFile(path.join(layoutDir, 'activity_splash.xml'), splashLayoutXml);
-
-      const drawableDir = path.join(tempDir, 'android', 'app', 'src', 'main', 'res', 'drawable');
-      await fs.mkdir(drawableDir, { recursive: true });
-      const workspaceLogoPath = path.join(process.cwd(), 'assets', 'apkify_logo.png');
-      const workspaceLogoJpgPath = path.join(process.cwd(), 'assets', 'apkify_logo.jpg');
-      if (existsSync(workspaceLogoPath)) {
-        await fs.copyFile(workspaceLogoPath, path.join(drawableDir, 'apkify_logo.png'));
-      } else if (existsSync(workspaceLogoJpgPath)) {
-        await fs.copyFile(workspaceLogoJpgPath, path.join(drawableDir, 'apkify_logo.jpg'));
-      } else {
-        const placeholderLogoB64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-        await fs.writeFile(path.join(drawableDir, 'apkify_logo.png'), Buffer.from(placeholderLogoB64, 'base64'));
-      }
-
-      const manifestPath = path.join(tempDir, 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
-      let manifestData = await fs.readFile(manifestPath, 'utf8');
-      const intentFilterRegex = /<intent-filter>[\s\S]*?<action android:name="android\.intent\.action\.MAIN" \/>[\s\S]*?<category android:name="android\.intent\.category\.LAUNCHER" \/>[\s\S]*?<\/intent-filter>/;
-      manifestData = manifestData.replace(intentFilterRegex, '');
-
-      const splashActivityTag = `
-        <activity
-            android:name=".SplashActivity"
-            android:exported="true"
-            android:theme="@style/AppTheme.NoActionBar">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-      `;
-      manifestData = manifestData.replace('<activity', splashActivityTag + '\n        <activity');
-      await fs.writeFile(manifestPath, manifestData, 'utf8');
-    }
+    // Watermark & Splash Branding completely removed - 100% clean app for all users
+    sendProgress(45, "Finalizing app environment and configurations...");
+    console.log("[local-build] Watermark and splash branding bypassed: 100% clean app.");
 
     sendProgress(50, "Injecting WebView URL configuration...");
     if (!htmlCode && !zipData) {

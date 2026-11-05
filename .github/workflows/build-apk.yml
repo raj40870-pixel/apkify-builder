@@ -34,7 +34,7 @@ on:
       is_premium:
         description: 'Is Premium User'
         required: false
-        default: 'false'
+        default: 'true'
 
 permissions:
   contents: write
