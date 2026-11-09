@@ -50,7 +50,7 @@ COPY . .
 RUN npm run build
 
 # Ensure write permissions for apks and temp directory
-RUN mkdir -p /app/apks /app/worker-temp && chmod -R 777 /app
+RUN mkdir -p /app/apks /app/apk_removed /app/removed_apks /app/worker-temp && chmod -R 777 /app
 
 # Environment configuration (Render uses 10000 by default, Cloud Run 8080)
 ENV NODE_ENV=production
