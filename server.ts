@@ -96,6 +96,44 @@ app.use(cors({
 app.options('*', cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Direct Cloud Run APK Download Streamer & Automatic Local Cache
+app.get('/apks/:filename', async (req, res, next) => {
+  try {
+    const rawFilename = req.params.filename;
+    const filename = path.basename(rawFilename).replace(/[^a-zA-Z0-9_.-]/g, '_');
+    if (!filename.endsWith('.apk')) return next();
+
+    const localPath = path.join(process.cwd(), 'apks', filename);
+
+    // 1. If file already exists locally in apks/ directory, deliver directly
+    if (existsSync(localPath)) {
+      res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.sendFile(localPath);
+    }
+
+    // 2. If instance restarted or older build, pull into local apks/ cache transparently
+    const repoOwner = process.env.GITHUB_REPO_OWNER || 'raj40870-pixel';
+    const repoName = process.env.GITHUB_REPO_NAME || 'apk-backend-';
+    const githubUrl = `https://github.com/${repoOwner}/${repoName}/releases/download/builds/${filename}`;
+
+    const remoteRes = await fetch(githubUrl);
+    if (remoteRes.ok) {
+      const arrayBuffer = await remoteRes.arrayBuffer();
+      await fs.writeFile(localPath, Buffer.from(arrayBuffer));
+      console.log(`[StorageEngine] Streamed & cached ${filename} locally in apks/ (${(arrayBuffer.byteLength / 1024 / 1024).toFixed(2)} MB)`);
+      res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.sendFile(localPath);
+    }
+
+    return res.status(404).json({ success: false, error: 'APK build not found or expired.' });
+  } catch (err: any) {
+    console.error('[StorageEngine] Error delivering APK:', err.message);
+    next();
+  }
+});
+
 app.use('/apks', express.static(path.join(process.cwd(), 'apks')));
 
 // Mount Auth & Admin & Support Routes
