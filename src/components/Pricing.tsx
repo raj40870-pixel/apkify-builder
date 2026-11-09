@@ -10,7 +10,7 @@ interface PlanProps {
 
 export default function Pricing({ onSelect }: PlanProps) {
   const features = [
-    { text: '3 APK Builds Every Day (Daily Reset at 00:00 Midnight)', highlight: true },
+    { text: '3 Free APK Builds Every 7 Days (Automated 7-Day Auto-Refill)', highlight: true },
     { text: '100% No Watermark (Clean App)', highlight: true },
     { text: 'Zero In-App Ads (No ads injected into your APK binary)', highlight: true },
     { text: 'Direct APK Download & Instant QR Code Scanner', highlight: false },

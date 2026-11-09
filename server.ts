@@ -53,6 +53,7 @@ const execAsync = promisify(exec);
 
 const app = express();
 mkdirSync(path.join(process.cwd(), 'apks'), { recursive: true });
+mkdirSync(path.join(process.cwd(), 'apk_removed'), { recursive: true });
 mkdirSync(path.join(process.cwd(), 'removed_apks'), { recursive: true });
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
@@ -64,20 +65,22 @@ async function handleApkFileMovement(downloadUrl: string | undefined, targetActi
   if (!fileName || !fileName.endsWith('.apk')) return;
 
   const activePath = path.join(process.cwd(), 'apks', fileName);
-  const removedPath = path.join(process.cwd(), 'removed_apks', fileName);
+  const removedPath1 = path.join(process.cwd(), 'apk_removed', fileName);
+  const removedPath2 = path.join(process.cwd(), 'removed_apks', fileName);
 
   try {
     if (targetAction === 'move_to_removed') {
       if (existsSync(activePath)) {
-        await fs.rename(activePath, removedPath).catch(async () => {
-          await fs.copyFile(activePath, removedPath);
+        await fs.rename(activePath, removedPath1).catch(async () => {
+          await fs.copyFile(activePath, removedPath1);
           await fs.unlink(activePath).catch(() => {});
         });
-        console.log(`[StorageEngine] Moved APK "${fileName}" from apks/ to removed_apks/ (7-Day Backup Vault)`);
+        console.log(`[StorageEngine] Moved APK "${fileName}" from apks/ to apk_removed/ (7-Day Backup Vault)`);
       }
     } else if (targetAction === 'permanent_delete') {
       if (existsSync(activePath)) await fs.unlink(activePath).catch(() => {});
-      if (existsSync(removedPath)) await fs.unlink(removedPath).catch(() => {});
+      if (existsSync(removedPath1)) await fs.unlink(removedPath1).catch(() => {});
+      if (existsSync(removedPath2)) await fs.unlink(removedPath2).catch(() => {});
       console.log(`[StorageEngine] Permanently deleted APK "${fileName}" from storage`);
     }
   } catch (err: any) {
@@ -555,18 +558,38 @@ async function buildApkViaGitHubActions(
     throw new Error(`GitHub Actions build ${conclusion || 'failed'}.`);
   }
 
-  sendProgress(95, 'Finalizing APK download URL...');
+  sendProgress(95, 'Storing compiled APK in backend storage...');
 
   const sanitizedAppName = appName.replace(/[^a-zA-Z0-9_-]/g, '_');
   const finalApkName = `${sanitizedAppName}.apk`;
-  const directDownloadUrl = `https://github.com/${repoOwner}/${repoName}/releases/download/builds/${finalApkName}`;
+  const apksDir = path.join(process.cwd(), 'apks');
+  await fs.mkdir(apksDir, { recursive: true }).catch(() => {});
+  const localApkPath = path.join(apksDir, finalApkName);
+
+  // Download compiled APK binary from GitHub runner into backend's apks/ folder
+  const githubReleaseUrl = `https://github.com/${repoOwner}/${repoName}/releases/download/builds/${finalApkName}`;
+  try {
+    const apkRes = await fetch(githubReleaseUrl);
+    if (apkRes.ok) {
+      const arrayBuffer = await apkRes.arrayBuffer();
+      await fs.writeFile(localApkPath, Buffer.from(arrayBuffer));
+      console.log(`[StorageEngine] Stored ${finalApkName} in backend apks/ folder (${(arrayBuffer.byteLength / 1024 / 1024).toFixed(2)} MB)`);
+    } else {
+      console.warn(`[StorageEngine] Failed to fetch APK from GitHub release: ${apkRes.status} ${apkRes.statusText}`);
+    }
+  } catch (dlErr: any) {
+    console.error(`[StorageEngine] Error downloading APK to local apks/ storage:`, dlErr.message);
+  }
+
+  // Direct backend download URL - served straight from Cloud Run's apks/ folder!
+  const backendDownloadUrl = `/apks/${finalApkName}`;
 
   sendProgress(100, 'Completed', {
     success: true,
-    downloadUrl: directDownloadUrl
+    downloadUrl: backendDownloadUrl
   });
 
-    return directDownloadUrl;
+  return backendDownloadUrl;
   } finally {
     // Zero-trace ephemeral cleanup: instantly delete user zip & icon from GitHub repository
     (async () => {
@@ -1271,7 +1294,7 @@ app.post('/api/build-apk', async (req, res) => {
 
     // CHECK 1 - Credit Check
     if (user && user.role !== 'admin' && user.credits_remaining <= 0) {
-      return res.status(403).json({ success: false, error: 'Your daily quota of 3 APK builds has been reached for today. Your credits will automatically reset tonight at midnight (00:00). 100% Free building continues tomorrow!' });
+      return res.status(403).json({ success: false, error: 'Your free quota of 3 APK builds has been reached for this 7-day cycle. Your credits automatically refill every 7 days from your last refill date.' });
     }
 
     // CHECK 2 - History Limit Check
@@ -1323,9 +1346,7 @@ app.post('/api/build-apk', async (req, res) => {
         // Build successful, add to history
         if (finalUserId) {
           const apkFilename = `${appName.replace(/[^a-zA-Z0-9_]/g, '_')}.apk`;
-          const finalDownloadUrl = (typeof resultUrl === 'string' && resultUrl.startsWith('http'))
-            ? resultUrl
-            : `/apks/${apkFilename}`;
+          const finalDownloadUrl = `/apks/${apkFilename}`;
 
           const activeExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30-Day Active Retention
           await Build.create({
@@ -1505,26 +1526,54 @@ const runSmartStoragePurgeEngine = async () => {
       }
     }
 
-    // 3. Storage Overflow FIFO Protection for removed_apks/
-    const removedApksDir = path.join(process.cwd(), 'removed_apks');
-    if (existsSync(removedApksDir)) {
-      const files = await fs.readdir(removedApksDir);
-      const apkFiles = files.filter(f => f.endsWith('.apk'));
-      const MAX_REMOVED_FILES = 30; // Safety cap
-      if (apkFiles.length > MAX_REMOVED_FILES) {
-        console.log(`[StorageEngine] removed_apks count (${apkFiles.length}) exceeds safety limit (${MAX_REMOVED_FILES}). Applying FIFO prune...`);
-        const fileStats = await Promise.all(
-          apkFiles.map(async (f) => {
-            const p = path.join(removedApksDir, f);
-            const stat = await fs.stat(p).catch(() => null);
-            return { file: f, path: p, mtime: stat ? stat.mtimeMs : 0 };
-          })
-        );
-        fileStats.sort((a, b) => a.mtime - b.mtime); // Oldest first
-        const toDelete = fileStats.slice(0, apkFiles.length - MAX_REMOVED_FILES);
-        for (const item of toDelete) {
-          await fs.unlink(item.path).catch(() => {});
-          console.log(`[StorageEngine] Pruned oldest vault file: ${item.file}`);
+    // 3. 80% Storage Threshold Check & Overflow FIFO Protection
+    let isHighStorageUsage = false;
+    try {
+      const statfsFn = (fs as any).statfsSync || require('fs').statfsSync;
+      if (typeof statfsFn === 'function') {
+        const diskStats = statfsFn(process.cwd());
+        if (diskStats && diskStats.blocks > 0) {
+          const usedPct = Math.round(((diskStats.blocks - diskStats.bfree) / diskStats.blocks) * 100);
+          console.log(`[StorageEngine] Current disk storage usage: ${usedPct}%`);
+          if (usedPct >= 80) {
+            isHighStorageUsage = true;
+            console.warn(`[StorageEngine] ⚠️ Disk storage exceeded 80% capacity (${usedPct}%). Initiating emergency FIFO cleanup of oldest APKs...`);
+          }
+        }
+      }
+    } catch (_) {}
+
+    const vaultDirs = [
+      path.join(process.cwd(), 'apk_removed'),
+      path.join(process.cwd(), 'removed_apks')
+    ];
+
+    for (const vaultDir of vaultDirs) {
+      if (existsSync(vaultDir)) {
+        const files = await fs.readdir(vaultDir);
+        const apkFiles = files.filter(f => f.endsWith('.apk'));
+        const MAX_REMOVED_FILES = isHighStorageUsage ? 5 : 30; // Shrink to 5 if >= 80% full
+        if (apkFiles.length > MAX_REMOVED_FILES || isHighStorageUsage) {
+          console.log(`[StorageEngine] Pruning vault in ${path.basename(vaultDir)} (Files: ${apkFiles.length}, 80% Alert: ${isHighStorageUsage})`);
+          const fileStats = await Promise.all(
+            apkFiles.map(async (f) => {
+              const p = path.join(vaultDir, f);
+              const stat = await fs.stat(p).catch(() => null);
+              return { file: f, path: p, mtime: stat ? stat.mtimeMs : 0 };
+            })
+          );
+          fileStats.sort((a, b) => a.mtime - b.mtime); // Oldest first
+          const pruneTarget = isHighStorageUsage 
+            ? Math.max(apkFiles.length - 5, Math.ceil(apkFiles.length * 0.5))
+            : (apkFiles.length - MAX_REMOVED_FILES);
+
+          if (pruneTarget > 0) {
+            const toDelete = fileStats.slice(0, pruneTarget);
+            for (const item of toDelete) {
+              await fs.unlink(item.path).catch(() => {});
+              console.log(`[StorageEngine] FIFO auto-pruned oldest vault file: ${item.file}`);
+            }
+          }
         }
       }
     }

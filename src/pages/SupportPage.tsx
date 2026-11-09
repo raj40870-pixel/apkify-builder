@@ -26,7 +26,7 @@ interface Ticket {
 const CATEGORIES = [
   { id: 'APK Build Issue / Stuck', label: 'APK Build Issue / Stuck', icon: Wrench, desc: 'Gradle compile error, stuck at 99%, or build failed' },
   { id: 'Download Link Expired / Broken', label: 'Download Link Expired / Broken', icon: Download, desc: 'Unable to download APK, 404 error or broken link' },
-  { id: 'Credits & 14-Day Auto-Refill', label: 'Credits & 14-Day Auto-Refill', icon: CreditCard, desc: 'Credit refill delay, billing or plan inquiries' },
+  { id: 'Credits & 7-Day Auto-Refill', label: 'Credits & 7-Day Auto-Refill', icon: CreditCard, desc: 'Credit refill delay, billing or plan inquiries' },
   { id: 'Account, Login & 2FA', label: 'Account, Login & 2FA', icon: UserCheck, desc: 'OTP verification, password reset, or account suspension' },
   { id: 'Feature Request & Ideas', label: 'Feature Request & Ideas', icon: Sparkles, desc: 'Suggest new plugins, Cordova/Capacitor tools or features' },
   { id: 'General Problem Solving', label: 'General Problem Solving', icon: HelpCircle, desc: 'Any other issue, bug report or technical question' }

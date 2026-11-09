@@ -524,7 +524,7 @@ export default function AdminPage() {
                       </td>
                       <td className="py-4 px-6">
                         <span className="font-mono text-sm font-bold text-[#00f2fe]">
-                          {u.role === 'admin' ? '∞ Unlimited' : `${u.credits_remaining} / 3 (Daily)`}
+                          {u.role === 'admin' ? '∞ Unlimited' : `${u.credits_remaining} / 3 (7-Day)`}
                         </span>
                       </td>
                       <td className="py-4 px-6">
@@ -533,7 +533,7 @@ export default function AdminPage() {
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-semibold">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                            14-Day Auto Refill
+                            7-Day Auto Refill
                           </span>
                         )}
                       </td>
@@ -770,7 +770,7 @@ export default function AdminPage() {
                 <option value="All">All Categories</option>
                 <option value="APK Build Issue / Stuck">APK Build Issue / Stuck</option>
                 <option value="Download Link Expired / Broken">Download Link Expired / Broken</option>
-                <option value="Credits & 14-Day Auto-Refill">Credits & 14-Day Auto-Refill</option>
+                <option value="Credits & 7-Day Auto-Refill">Credits & 7-Day Auto-Refill</option>
                 <option value="Account, Login & 2FA">Account, Login & 2FA</option>
                 <option value="Feature Request & Ideas">Feature Request & Ideas</option>
                 <option value="General Problem Solving">General Problem Solving</option>

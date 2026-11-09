@@ -44,14 +44,14 @@ export default function TermsPage() {
         <section>
           <div className="flex items-center gap-3 mb-4">
             <FileText className="w-6 h-6 text-purple-500" />
-            <h2 className="text-2xl font-bold m-0">2. Starter Quota & Daily Auto-Refill</h2>
+            <h2 className="text-2xl font-bold m-0">2. Starter Quota & 7-Day Auto-Refill</h2>
           </div>
           <p className="text-white/80 leading-relaxed">
-            Every registered developer receives 3 APK build credits every single day:
+            Every registered developer receives 3 APK build credits every 7 days:
           </p>
           <ul className="text-white/80 space-y-2 mt-4 ml-6 list-disc">
-            <li><strong>Daily Midnight Refill:</strong> Free credits automatically refill back to 3 credits every night at 00:00 (Midnight). No manual intervention is needed.</li>
-            <li><strong>Non-Cumulative Quota:</strong> Unused credits do not stack. The balance resets to a daily cap of 3.</li>
+            <li><strong>Automated 7-Day Refill:</strong> Free credits automatically refill back to 3 credits every 7 days from your last refill date. No manual intervention is needed.</li>
+            <li><strong>Non-Cumulative Quota:</strong> Unused credits do not stack. The balance resets to a cap of 3.</li>
             <li><strong>Immediate Deduction & Auto-Refund:</strong> Credits are deducted upon build dispatch. If a build fails due to server issue, credits are automatically refunded.</li>
             <li><strong>100% Watermark-Free:</strong> All APKs generated on APKify Builder are completely free of platform watermarks, badges, or brand overlays.</li>
             <li><strong>Zero In-App Ads:</strong> We never inject any third-party advertisements or SDKs into your compiled Android APK binaries.</li>

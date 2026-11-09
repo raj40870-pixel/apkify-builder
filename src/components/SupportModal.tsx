@@ -16,7 +16,7 @@ interface SupportModalProps {
 const CATEGORIES = [
   { id: 'APK Build Issue / Stuck', label: 'APK Build Issue / Stuck', icon: Wrench },
   { id: 'Download Link Expired / Broken', label: 'Download Link Expired / Broken', icon: Download },
-  { id: 'Credits & 14-Day Auto-Refill', label: 'Credits & 14-Day Auto-Refill', icon: CreditCard },
+  { id: 'Credits & 7-Day Auto-Refill', label: 'Credits & 7-Day Auto-Refill', icon: CreditCard },
   { id: 'Account, Login & 2FA', label: 'Account, Login & 2FA', icon: UserCheck },
   { id: 'Feature Request & Ideas', label: 'Feature Request & Ideas', icon: Sparkles },
   { id: 'General Problem Solving', label: 'General Problem Solving', icon: HelpCircle }

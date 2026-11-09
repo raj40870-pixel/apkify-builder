@@ -28,7 +28,7 @@ const extractUser = async (req: any) => {
 const CATEGORY_MAP: Record<string, string> = {
   'build_issue': 'APK Build Issue / Stuck',
   'download_expired': 'Download Link Expired / Broken',
-  'billing_credits': 'Credits & 14-Day Auto-Refill',
+  'billing_credits': 'Credits & 7-Day Auto-Refill',
   'account_auth': 'Account, Login & 2FA',
   'feature_request': 'Feature Request & Ideas',
   'other_problem': 'General Problem Solving'
@@ -41,7 +41,7 @@ router.get('/categories', (req, res) => {
     categories: [
       { id: 'APK Build Issue / Stuck', label: 'APK Build Issue / Stuck', icon: 'Wrench', description: 'Gradle compile error, build failed or infinite loading' },
       { id: 'Download Link Expired / Broken', label: 'Download Link Expired / Broken', icon: 'Download', description: 'Unable to download APK, 404 error or corrupted package' },
-      { id: 'Credits & 14-Day Auto-Refill', label: 'Credits & 14-Day Auto-Refill', icon: 'CreditCard', description: 'Credit balance issues, plan refill or payment inquiries' },
+      { id: 'Credits & 7-Day Auto-Refill', label: 'Credits & 7-Day Auto-Refill', icon: 'CreditCard', description: 'Credit balance issues, plan refill or payment inquiries' },
       { id: 'Account, Login & 2FA', label: 'Account, Login & 2FA', icon: 'UserCheck', description: 'Password reset, email OTP, 2FA or suspension appeals' },
       { id: 'Feature Request & Ideas', label: 'Feature Request & Ideas', icon: 'Sparkles', description: 'Suggest new features, SDK upgrades or UI improvements' },
       { id: 'General Problem Solving', label: 'General Problem Solving', icon: 'HelpCircle', description: 'Any other issue, bug report or technical question' }

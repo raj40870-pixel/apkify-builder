@@ -26,30 +26,29 @@ export const checkExpiry = async (user: any) => {
     isModified = true;
   }
 
-  // 2. Daily Quota Refill: 3 APK Builds per day (Resets at midnight or after 24 hours)
+  // 2. 7-Day Quota Refill: 3 APK Builds every 7 days
   if (user.role !== 'admin') {
     if (!user.last_credit_refill) {
       user.credits_remaining = 3;
       user.last_credit_refill = now;
-      user.credit_system_version = 3;
+      user.credit_system_version = 5;
       isModified = true;
     } else {
       const lastRefill = new Date(user.last_credit_refill);
-      const isNewCalendarDay = now.toDateString() !== lastRefill.toDateString();
-      const is24HoursPassed = (now.getTime() - lastRefill.getTime()) >= 24 * 60 * 60 * 1000;
+      const nextRefillDate = new Date(lastRefill.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-      if (isNewCalendarDay || is24HoursPassed) {
+      if (now >= nextRefillDate) {
         user.credits_remaining = 3;
         user.last_credit_refill = now;
-        user.credit_system_version = 3;
+        user.credit_system_version = 5;
         isModified = true;
       }
     }
 
-    // Migration to version 3 (3 builds daily quota)
-    if (user.credit_system_version !== 3) {
+    // Migration to version 5 (3 builds per 7-day quota)
+    if (user.credit_system_version !== 5) {
       user.credits_remaining = Math.min(3, user.credits_remaining ?? 3);
-      user.credit_system_version = 3;
+      user.credit_system_version = 5;
       isModified = true;
     }
   }
@@ -177,7 +176,8 @@ router.post('/verify-signup-otp', async (req: any, res: any) => {
       credits_remaining: 3,
       history_limit: 10,
       plan_type: 'Free',
-      credit_system_version: 3,
+      credit_system_version: 5,
+      last_credit_refill: new Date(),
       watermark_enabled: false
     });
     await newUser.save();

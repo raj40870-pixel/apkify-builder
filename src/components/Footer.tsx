@@ -121,7 +121,7 @@ export default function Footer() {
               24/7 Automated Infrastructure
             </span>
             <span>&bull;</span>
-            <span>14-Day Auto-Refill Guarantee</span>
+            <span>7-Day Auto-Refill Guarantee</span>
             <span>&bull;</span>
             <span>Developer Support Active</span>
           </div>

@@ -66,7 +66,7 @@ const userSchema = new mongoose.Schema<IUser>({
   },
   credit_system_version: {
     type: Number,
-    default: 3
+    default: 5
   },
   watermark_enabled: {
     type: Boolean,

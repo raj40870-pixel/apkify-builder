@@ -33,22 +33,37 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
   const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = currentUser?.role === 'admin' || currentUser?.email === 'kamaljit444501@gmail.com';
-  const [resetCountdown, setResetCountdown] = useState<string>('In 24h 00m');
+  const [resetCountdown, setResetCountdown] = useState<string>('In 7 Days');
 
   useEffect(() => {
     const updateCountdown = () => {
+      const refillSource = liveUser?.last_credit_refill || currentUser?.last_credit_refill;
+      if (!refillSource) {
+        setResetCountdown('Every 7 Days');
+        return;
+      }
+      const lastRefill = new Date(refillSource);
+      const nextRefill = new Date(lastRefill.getTime() + 7 * 24 * 60 * 60 * 1000);
       const now = new Date();
-      const midnight = new Date(now);
-      midnight.setHours(24, 0, 0, 0);
-      const diffMs = midnight.getTime() - now.getTime();
-      const hours = Math.floor(diffMs / (1000 * 60 * 60));
-      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-      setResetCountdown(`In ${hours}h ${minutes}m (00:00)`);
+      const diffMs = nextRefill.getTime() - now.getTime();
+
+      if (diffMs <= 0) {
+        setResetCountdown('Ready for Refill');
+      } else {
+        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        if (days > 0) {
+          setResetCountdown(`In ${days}d ${hours}h`);
+        } else {
+          const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+          setResetCountdown(`In ${hours}h ${minutes}m`);
+        }
+      }
     };
     updateCountdown();
-    const interval = setInterval(updateCountdown, 30000);
+    const interval = setInterval(updateCountdown, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [liveUser?.last_credit_refill, currentUser?.last_credit_refill]);
 
   useEffect(() => {
     // Fetch live user state on load
@@ -248,7 +263,7 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
             
             <div className="space-y-3.5 mt-5">
                <div className="flex justify-between items-center text-sm py-1.5 border-b border-white/[0.04]">
-                 <span className="text-white/60">APK Builds Today:</span>
+                 <span className="text-white/60">Build Quota:</span>
                  {isAdmin ? (
                    <span className="font-mono font-bold text-xs text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
                      ∞ Unlimited
@@ -259,8 +274,34 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
                    </span>
                  )}
                </div>
-               
+
                <div className="flex justify-between items-center text-sm py-1.5 border-b border-white/[0.04]">
+                 <span className="text-white/60">Auto-Renewal:</span>
+                 {isAdmin ? (
+                   <span className="font-mono text-xs font-semibold text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
+                     Continuous
+                   </span>
+                 ) : (
+                   <span className="font-medium text-white/90 text-xs">
+                     Every 7 Days
+                   </span>
+                 )}
+               </div>
+
+               <div className="flex justify-between items-center text-sm py-1.5 border-b border-white/[0.04]">
+                 <span className="text-white/60">Next Refill:</span>
+                 {isAdmin ? (
+                   <span className="font-mono text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
+                     No Limits
+                   </span>
+                 ) : (
+                   <span className="font-mono text-xs font-semibold text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
+                     {resetCountdown}
+                   </span>
+                 )}
+               </div>
+
+               <div className="flex justify-between items-center text-sm py-1.5">
                  <span className="text-white/60">History Slots:</span>
                  <span className="font-mono font-semibold text-white/90 text-xs">
                    {isAdmin ? (
@@ -271,19 +312,6 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
                      `${history.length} / ${creditState.historyLimit} Slots`
                    )}
                  </span>
-               </div>
-
-               <div className="flex justify-between items-center text-sm py-1.5">
-                 <span className="text-white/60">Daily Reset:</span>
-                 {isAdmin ? (
-                   <span className="font-mono text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
-                     No Daily Limits
-                   </span>
-                 ) : (
-                   <span className="font-mono text-xs font-semibold text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
-                     {resetCountdown}
-                   </span>
-                 )}
                </div>
             </div>
 
@@ -296,7 +324,7 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
               ) : (
                 <>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span className="text-emerald-400/90">Free Plan • Daily Reset at 00:00</span>
+                  <span className="text-emerald-400/90">Free Plan • 7-Day Auto-Refill Cycle</span>
                 </>
               )}
             </div>
@@ -512,12 +540,12 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
                     </span>
                   </div>
                   <p className="text-xs text-white/50 mt-1 leading-relaxed">
-                    Hides from your active dashboard. Kept in 7-day backup vault (<code className="text-blue-300/80 text-[11px]">removed_apks</code>), then auto-purged on day 7.
+                    Hides from your active dashboard. Kept in 7-day backup vault (<code className="text-blue-300/80 text-[11px]">apk_removed</code>), then auto-purged on day 7.
                   </p>
                 </div>
               </button>
 
-              {/* Option 2: Permanent Delete (Instant Wipe) */}
+              {/* Option 2: Permanent Delete (Permanent Delete) */}
               <button
                 disabled={isDeleting}
                 onClick={() => handleConfirmDelete('permanent')}
@@ -529,14 +557,14 @@ export default function DashboardPage({ user, onLogout: parentOnLogout }: Dashbo
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-white text-sm group-hover:text-red-300 transition-colors">
-                      Delete Permanently
+                      Delete for Everyone
                     </span>
                     <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">
-                      Instant Wipe
+                      Permanent Delete
                     </span>
                   </div>
                   <p className="text-xs text-white/50 mt-1 leading-relaxed">
-                    Instantly wipes the APK file and data completely from disk and database. Cannot be recovered.
+                    Permanently wipes the APK file and data completely from disk and database for everyone. Cannot be recovered.
                   </p>
                 </div>
               </button>
