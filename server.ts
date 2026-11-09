@@ -1526,6 +1526,22 @@ const runSmartStoragePurgeEngine = async () => {
       }
     }
 
+    // 2b. Direct Disk Hygiene: Auto-delete physical APK files in apks/ older than 30 days
+    const activeApksDir = path.join(process.cwd(), 'apks');
+    if (existsSync(activeApksDir)) {
+      const activeFiles = await fs.readdir(activeApksDir).catch(() => []);
+      for (const file of activeFiles) {
+        if (file.endsWith('.apk')) {
+          const filePath = path.join(activeApksDir, file);
+          const stat = await fs.stat(filePath).catch(() => null);
+          if (stat && stat.mtimeMs < thirtyDaysAgo.getTime()) {
+            await fs.unlink(filePath).catch(() => {});
+            console.log(`[StorageEngine] Auto-purged 30-day physical expired APK from disk: ${file}`);
+          }
+        }
+      }
+    }
+
     // 3. 80% Storage Threshold Check & Overflow FIFO Protection
     let isHighStorageUsage = false;
     try {
